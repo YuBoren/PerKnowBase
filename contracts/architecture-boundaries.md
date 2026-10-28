@@ -177,50 +177,29 @@ apps/ui ──(generated TS only)──> apps/desktop/src-tauri ──> L3 servi
 
 ## 7. 异步、错误与幂等边界
 
-1. **取消**：每个长任务持有 `CancelToken`；`cancel` 必须幂等，重复取消返回成功；取消后必须清理 `.tmp` 写入。
-2. **超时**：sidecar 解析默认 300s/文件；LLM 默认 60s；索引操作 30s；超时映射为可重试错误并计入 `warnings`。
-3. **重试**：只允许在 `index`、`llm`、sidecar 调用边界内重试（指数退避 + 抖动，≤3 次）；**禁止**在 shell/UI 层重试写操作（会产生重复数据）。
-4. **幂等键**：`(kb_id, rel_path, content_hash)` 是文件级幂等键；`chunk_id` 复用规则见 `data-model.md` §2.5。
-5. **部分失败**：批处理必须返回 `warnings[]` 且任务状态 `partial_failed`；UI 必须能展示失败清单并支持“仅重试失败项”。
-6. **原子性**：任何跨库/跨引擎操作（融合、导入、导出、删除）必须先写日志表再执行，失败按日志回滚（`merge_journal`/`.import-tmp`/`.tmp` 目录）。
-7. **顺序保证**：同一 KB 的写操作串行化（`kb.lock` + 内存互斥）；不同 KB 可并行。检索（只读）不持写锁。
+1. **取消**：长任务持 `CancelToken`；取消幂等，重复取消返回成功，并清理 `.tmp` 写入。
+2. **超时与重试**：sidecar 解析 300s/文件、LLM 60s、索引 30s；仅 `index`/`llm`/sidecar 边界可重试（退避 ≤3 次），shell/UI 不得重试写操作。
+3. **幂等键**：文件级 `(kb_id, rel_path, content_hash)`；`chunk_id` 复用规则见 `data-model.md` §2.5。
+4. **部分失败**：批处理返回 `warnings[]` + 状态 `partial_failed`；UI 可展示失败清单并“仅重试失败项”。
+5. **原子性与顺序**：跨库/跨引擎操作先写日志再执行、失败按日志回滚；同一 KB 写操作串行（`kb.lock`），检索不持写锁。
 
 ---
 
 ## 8. 质量闸门与评审清单
 
-### 8.1 CI 闸门（Phase-1 落地）
+### 8.1 CI 闸门
 
-1. `cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`。
-2. `tsc --noEmit`、ESLint、前端单测。
-3. 契约校验：`scripts/validate-contracts`（版本一致、schema 合法、示例过 schema）。
-4. 生成物校验：重新生成 Rust→TS 与 command client，diff 必须为空。
-5. 依赖方向：`scripts/check-deps` 对照 §2 矩阵。
-6. 禁令扫描：`scripts/check-boundaries` 扫描 §3.2 关键 import（`tauri`、`rusqlite`、`qdrant_client`、`tantivy`、`ort`）。
-7. 迁移校验：空库顺序执行 + `schema_version` 单调。
-8. 集成冒烟：建库 → 解析样例 → 极简检索 → 命中可跳转。
+`fmt/clippy/test`、`tsc/lint/单测`、契约校验（版本/schema）、生成物 diff 为空、依赖方向（`check-deps`）、禁令扫描（`check-boundaries`）、迁移空库顺序执行、集成冒烟（建库→解析→检索→跳转）。全部为 required checks。
 
 ### 8.2 评审清单（每个 PR 自检）
 
 - [ ] 只改了自己 owner 的目录（或已走共享模块流程）
-- [ ] 契约未变，或已更新 `contracts/` + `CHANGELOG` + `crates/contracts`
+- [ ] 契约未变，或已同步 `contracts/` + `CHANGELOG` + `crates/contracts`
 - [ ] 没有新增跨层调用（对照 §2/§3）
 - [ ] 错误走 `AppError`，无 `unwrap` 泄漏到边界
-- [ ] 长任务可取消、无界并发已限流
+- [ ] 长任务可取消、并发已限流
 - [ ] 日志无正文/密钥/绝对路径
 - [ ] 新增依赖已记 `decisions.md` + `LICENSES/`
 - [ ] 影响对方的决策已写 `decisions.md` 并通知
-- [ ] 测试覆盖新增分支；集成用例在 `tests/integration`
+- [ ] 测试覆盖新增分支，集成用例在 `tests/integration`
 - [ ] 无手改生成物
-
----
-
-## 9. 落地顺序（Phase-0 → Phase-1）
-
-| 阶段 | 动作 | 产出 |
-|---|---|---|
-| Phase-0（第 0 周） | 冻结本文件 + 接口 + 数据模型；建 crate 骨架与空 trait；CI 空跑 | `contract_version=0.1.0` |
-| Phase-1（第 1–2 周） | 落地 §8.1 的 1–7 号闸门；`scripts/check-deps`、`check-boundaries` 生效 | 架构违规即 CI 失败 |
-| Phase-2（第 3 周起） | 每新增共享模块条目补进 §4.1；豁免清单纳入集成日 | 无“隐性共享模块” |
-
-> 记住一句话：**契约是宪法，边界是海关，`decisions.md` 是海关的通关记录。** 三者缺一，4 人 + 4 个 Agent 并行就会退化成互相踩踏。

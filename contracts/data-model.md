@@ -115,7 +115,7 @@
 | `text` | `line_start`, `line_end` (1-based) | 文本/markdown/代码/html/json：行号必须可跳转 |
 | `pdf` | `page` (1-based) | `bbox` 可选（PDF 坐标，左上原点）；用于高亮 |
 | `image` | `file` | 图片只定位到文件 |
-| `table` | `sheet`, 可选 `row`/`col` | csv/xlsx/csv 类 |
+| `table` | `sheet`, 可选 `row`/`col` | csv：`sheet` 为文件名；xlsx：按 sheet 必填 |
 | `notebook` | `cell`(0-based), `cell_kind` | ipynb code/markdown 分离后回指 |
 
 **不变量**：`text.line_end >= line_start >= 1`；`pdf.page >= 1`；`image.file` 必须等于该 chunk 所属 `rel_path`。
@@ -378,17 +378,7 @@
 `MoveResult`：`{moved:u32, failed:[{from, code, message}]}`。
 `MoveOp`：`{from:string, to_parent:string}`。
 
-### 2.16 与立项报告 DR-08 的映射
-
-| 立项报告 DR-08 | 本文类型 | 备注 |
-|---|---|---|
-| KnowledgeBase | `KnowledgeBase` | 原名 `KnowledgeBaseMeta` 废弃（DEC-20261026-12） |
-| FileNode / DocumentChunk / EmbeddingRecord | 同名 | — |
-| SearchRequest / SearchResult / Citation / PromptPackage | 同名 | — |
-| SyncTask / ExportManifest | 同名 | — |
-| （新增） | `SyncEvent`、`ParsedDocument`、`SourceLocation`、`HistoryRecord`、`MergeRequest`、`RebuildPlan`、`AppError`、`AppSettings`、`KbSettings`、`OperationHandle` | 实现必需，已纳入契约 |
-
-### 2.17 命令 DTO 与端口类型（最小定义）
+### 2.16 命令 DTO 与端口类型（最小定义）
 
 > 跨模块传递的类型必须在此登记；未登记的“匿名 JSON”禁止出现在 trait/命令边界。
 
@@ -419,7 +409,7 @@
 | `RepoTx`（内部） | 不透明事务句柄，仅 `MetadataRepo::tx` 内可见 | A |
 | `AppInfo` | `{version, contract_version, schema_version, platform, parser_protocol_version}` | A |
 
-### 2.18 `AppError`（统一错误载荷）
+### 2.17 `AppError`（统一错误载荷）
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
@@ -728,7 +718,7 @@
 
 `IndexStatus`：`pending → indexing → indexed | stale | failed`；`indexed` 在路径/元数据变更后仍为 `indexed`（payload 已同步）；索引不可用时全局置 `stale`。
 
-`FileKind`：`text | markdown | pdf | docx | html | csv | json | notebook | code | image | other`。
+`FileKind`：`text | markdown | pdf | docx | html | csv | xlsx | json | notebook | code | image | other`。
 
 | 扩展名 | kind | 解析路径 |
 |---|---|---|
@@ -737,7 +727,8 @@
 | .pdf | pdf | MinerU |
 | .docx | docx | MinerU |
 | .html/.htm | html | MinerU（抽正文） |
-| .csv | csv | MinerU/表格读取 → `table` 块 |
+| .csv | csv | MinerU/表格读取 → `table` 块（`sheet` 为文件名） |
+| .xlsx | xlsx | MinerU/表格读取 → `table` 块（按 sheet 拆分，`sheet` 必填）；`.xls` 尽力支持，不计入验收 |
 | .json | json | native |
 | .ipynb | notebook | native：code cells + markdown cells 分别解析（立项报告 2.4） |
 | .c/.cpp/.rs/.py/.js/.ts/... | code | native，AST 感知分块 |
@@ -821,17 +812,14 @@
 规则：
 
 1. 缓存键 = `(file_id, content_hash, parser_version, parse_options_hash)`；任一变化即未命中。
-2. 缓存**只增不改**；删除文件时随 `file_node` 级联清理。
-3. `parsed.json` 中的路径必须是 `rel_path`；禁止写入绝对路径（导出/迁移会失效）。
-4. 缓存可安全删除：删除后行为等价于首次解析（`cache_enabled=false` 时不写缓存）。
-5. 导出时按 `ExportRequest.include_cache` 决定是否打包（默认否）。
+2. 缓存只增不改，删除文件时级联清理；可安全删除（等价首次解析）。
+3. `parsed.json` 内只用 `rel_path`；导出时按 `ExportRequest.include_cache` 决定是否打包。
 
 ---
 
-## 8. 数据边界与隐私
+## 8. 数据边界
 
-1. `files/` 副本是用户敏感数据，任何日志/事件/错误详情不得包含文件正文；`preview` 只出现在显式 API 响应中。
-2. LLM API 请求只允许发送：`query` + 检索到的 `context_blocks` + 指令；**禁止**附带 `rel_path` 之外的绝对路径、用户目录结构、API 密钥。
-3. `rel_path` 与文件名可以发送（作为引用标注），若用户开启“脱敏模式”（Phase-2），替换为 `文档1/文档2`。
-4. 密钥存储：不得明文入 SQLite；使用系统凭据库（Windows Credential Manager / libsecret），不可用时退化为 AES-GCM + 主密钥文件（权限 0600）。
-5. 删除知识库 = 删除 `root_dir` + Qdrant collection + Tantivy 目录 + 注册表行，四者必须全部成功或全部失败（失败保留注册表并提供“清理残留”）。
+1. 日志/事件/错误不得含文件正文；`preview` 只出现在显式响应中。
+2. 发往 LLM 的内容仅限：`query` + 检索到的 `context_blocks` + 指令；禁止绝对路径、目录结构、密钥。
+3. 密钥不明文入 SQLite：用系统凭据库，不可用时 AES-GCM + 0600 主密钥文件。
+4. 删除知识库 = 删 `root_dir` + Qdrant collection + Tantivy 目录 + 注册表行，要么全成功要么全失败（失败保留注册表并提供“清理残留”）。

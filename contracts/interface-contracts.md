@@ -13,11 +13,10 @@
 3. **长任务一律异步化**：`kb_create/kb_import/kb_export/kb_merge/kb_delete/kb_rebuild/kb_switch` 返回 `OperationHandle`，进度走事件；**禁止在 command 内同步等待解析/索引完成**（1 万文件会超时）。
 4. **幂等**：`fs_add_files`、`fs_move`、`sync_trigger`、`index_upsert`、`kb_import` 按 `(kb_id, rel_path, content_hash)` 幂等；重放不得产生重复行或重复向量。
 5. **错误**：统一 `AppError`（§2）。**禁止** `unwrap`/`expect` 穿透到 command 边界；**禁止**把第三方错误字符串直接作为 `code`。
-6. **时间与排序**：`SearchResult.hits` 按 `rank` 升序（0 为最佳）；`history_list` 按 `created_at` 降序；`fs_list_children` 目录在前、按名称本地化排序。
-7. **分页**：列表接口必须分页（`offset/limit`，`limit <= 200`），`fs_list_children` 单目录超过 5000 项时返回 `has_more`。
-8. **日志与关联**：每次 command 生成 `correlation_id`（UUIDv7），贯穿 Rust/sidecar 日志与 `error://toast`；日志不得包含文件正文与 API 密钥。
-9. **DTO 校验**：命令入参是独立 DTO（`#[serde(deny_unknown_fields)]`），不得直接把领域对象当入参，避免内部字段被前端写入。
-10. **禁止跨层调用**：command 层不得直接调用 `crates/index`/`crates/pipeline`/Qdrant/SQLite，只能调应用服务 trait（见 `architecture-boundaries.md`）。
+6. **排序与分页**：`hits` 按 `rank` 升序；`history_list` 按 `created_at` 降序；目录在前、名称本地化排序。列表必须分页（`limit <= 200`），单目录 >5000 项返回 `has_more`。
+7. **日志与关联**：每次 command 生成 `correlation_id`，贯穿 Rust/sidecar 日志与 `error://toast`；日志不含正文与密钥。
+8. **DTO 校验**：命令入参用独立 DTO（`deny_unknown_fields`），不得直接收领域对象。
+9. **禁止跨层调用**：command 层只能调应用服务 trait，不得直接碰 `index`/`pipeline`/Qdrant/SQLite。
 
 ---
 
@@ -206,7 +205,7 @@ pub trait SyncService: Send + Sync {
 }
 ```
 
-`SyncAction` 取值与落库映射见 `data-model.md` §5.3；路由必须满足“移动只更元数据路径”。
+`SyncAction` 取值与落库映射见 `data-model.md` §5.4；路由必须满足“移动只更元数据路径”。
 
 ### 3.7 索引（B）
 
@@ -363,7 +362,7 @@ pub trait CommandRouter: Send + Sync { fn register(&self, app: &mut tauri::App);
 |---|---|---|
 | `initialize` | Rust→sidecar（请求） | `{protocol_version:"1.0", app_version, cache_root, log_level, max_parallel}`；返回 `{protocol_version, mineru_version, supported_formats[], device}`；版本不兼容返回 `-32001 PROTOCOL_MISMATCH` |
 | `health` | Rust→sidecar | `{}` → `{ok, uptime_ms, inflight, visited}`；用于启动探活与心跳 |
-| `parse_file` | Rust→sidecar | `{file_id, kb_id, abs_path, format, cache_dir, options:{mode:"flash\|basic\|standard\|advanced", page_range?, keep_cache:true, ocr:false}}` → `ParsedDocument`（见 `data-model.md` §3.6） |
+| `parse_file` | Rust→sidecar | `{file_id, kb_id, abs_path, format, cache_dir, options:{mode:"flash\|basic\|standard\|advanced", page_range?, keep_cache:true, ocr:false}}` → `ParsedDocument`（见 `data-model.md` §2.4） |
 | `cancel` | Rust→sidecar | `{id:"<被取消的 parse_file id>"}` → `{cancelled:true}`；被取消请求返回 `-32002 CANCELLED` |
 | `shutdown` | Rust→sidecar | `{}` → `{ok:true}` 后进程退出 |
 
@@ -401,80 +400,29 @@ pub trait CommandRouter: Send + Sync { fn register(&self, app: &mut tauri::App);
 
 ## 7. 关键时序
 
-### 7.1 创建知识库（`kb_create`）
+### 7.1 创建知识库
 
-```
-UI → kb_create{dest_name, source_dir, options}
-A  : 生成 kb_id → 建 storage_root/<kb_id>.tmp/ → 复制副本（保留 mtime/权限）
-   : 建 kb.sqlite3（schema v1）→ 写 kb_meta → 发 kb://op-progress(phase=copy)
-   : 标记全部 file_node.parse_status=pending, index_status=pending
-   : 发 kb://op-progress(phase=parse_index) → C: 管线并行（≤2）解析+分块+嵌入
-   : 每文件完成 → B: index.upsert（Qdrant+Tantivy）→ A: 事务更新状态
-   : 全部完成 → 原子 rename 为 <kb_id>/ → 注册表写入 → kb://op-done
-   : 中途取消/崩溃 → 保留 .tmp 供诊断，启动时清理；注册表不写
-```
+`kb_create` → 建 `<storage_root>/<kb_id>.tmp/` 并复制副本 → 建 `kb.sqlite3`、写 `kb_meta`、标记全部 `pending` → 发 `kb://op-progress(copy)` → C 管线（≤2 并发）解析/分块/嵌入，逐文件交 B `index.upsert`，A 事务更新状态 → 全部成功后原子 rename 为 `<kb_id>/` 并写注册表 → `kb://op-done`。中途取消/崩溃保留 `.tmp`，注册表不写。
 
-### 7.2 增量同步（自动监听 / `fs_*` 主动操作）
+### 7.2 增量同步
 
-```
-C  : watch 事件(passive) 或 fs 操作(active) → 去抖(默认 500ms) → SyncEvent
-   : SyncRouter.route(ev) → SyncAction:
-      create/modify → [parse, chunk, embed, index_upsert, meta_update]
-      delete        → [index_delete, meta_delete]
-      move          → [meta_update(rel_path), index_path_update]  ← 不重新解析
-   : 若 content_hash 未变（move/仅 mtime）→ 只更元数据
-   : 执行中发 sync://progress；单文件失败 → 记录 warnings、index_status=failed，任务 partial_failed
-```
+监听（passive）或 `fs_*`（active）→ 去抖 500ms → `SyncEvent` → `SyncRouter`：`create/modify` 走 parse→chunk→embed→index_upsert→meta_update；`delete` 走 index_delete→meta_delete；`move` 只改元数据与索引路径（不重新解析）。过程中发 `sync://progress`；单文件失败记 `warnings` 并置 `index_status=failed`，任务 `partial_failed`。
 
-### 7.3 极简 / 总结 / 测试检索
+### 7.3 三模式检索
 
-```
-UI → search_minimal(req)  [req.request_id 由前端生成]
-B  : 校验 req（top_k、hybrid 组合、kb 是否打开）
-   : Retriever → BM25(top 50) + Vector(top 50) → RRF(k=60) → 过滤 → 截断 top_k
-   : MetadataRepo.chunk_get 补 preview（截断到 settings.display.preview_chars）
-   : 返回 SearchResult{hits ordered by rank, index_version}
-summary: 同上 → PromptBuilder(mode=summary) → LlmGateway → 解析 [n] 引用 →
-         校验每个 citation 的 hit_ref 存在（否则 LLM_RESPONSE_INVALID→降级）
-test   : 同上 → PromptBuilder(mode=test) → 返回 PromptPackage（不调 LLM）
-历史     : 成功后 HistoryService.record（异步、失败不影响检索结果）
-```
+`search_minimal/summary/test`：校验请求 → BM25(top50) + Vector(top50) → RRF(k=60) → 过滤/截断 → 用 `chunk` 补 `preview` → 返回 `SearchResult`。**summary** 再经 `PromptBuilder` + `LlmGateway`，校验 `[n]` 引用存在（越界则降级）；**test** 只返回 `PromptPackage`，不调 LLM；成功后异步写历史，失败不影响检索结果。
 
-### 7.4 导入 / 导出
+### 7.4 其余流程（要点）
 
-```
-export: 校验 KB 已关闭写窗口（持 KB 写锁）→ 打包 manifest.json + files/ + kb.sqlite3 +
-        index/(tantivy + qdrant.snapshot) + checksums.sha256(+ 可选 cache/) → 写 temp → rename
-import: 解压到 .import-tmp → 校验 manifest.contract_version/schema_version/checksums →
-        版本过高 → EXPORT_VERSION_UNSUPPORTED；一致 → rename 到 storage_root/<kb_id>/ →
-        C 重建缺失的解析缓存；B restore 索引快照（失败则整库重建索引）
-```
-
-### 7.5 融合（`kb_merge`）
-
-```
-A: 预检（目标根存在、目录不冲突、磁盘空间）→ 生成 merge_journal(status=planned) 并 fsync
- : 逐文件 复制(A→B) 或 移动 → 更新目标库 file_node/chunk 的 kb_id+rel_path
- : B: index.upsert 目标库（新 chunk_id 或沿用 chunk_id，payload 改 kb_id/rel_path）
- : 全部成功 → committed；move 模式 → 删除源库（副本+索引+元数据）
- : 任一步失败 → 按 journal 逆序回滚（删除已复制文件、恢复被移动文件、删除新写入索引）
-```
-
-### 7.6 重构（`kb_rebuild`，由 `kb://rebuild-required` 触发）
-
-```
-A: 校验无其他排他操作 → 记 rebuild_state(step, done, total) → 冻结 watcher
- : C: 清空 cache（策略/模型变更）→ 重新解析+分块+嵌入（分批 200 文件）
- : B: 删除旧 collection/full-text 索引 → 用新配置 ensure_collection → 重新 upsert
- : A: 更新 kb_meta.settings_snapshot 与 index_version → 解冻 watcher → kb://op-done
- : 中断可续跑：rebuild_state 记录已完成批次；重新启动后从未完成批次继续
-```
+- **导入/导出**：导出持 KB 写锁打包 `manifest.json + files/ + kb.sqlite3 + index/ + checksums`；导入先在 `.import-tmp` 校验版本与校验和，再原子 rename，然后 C 重建缓存、B 恢复索引（失败则整库重建索引）。
+- **融合**：预检 → 写 `merge_journal(planned)` 并 fsync → 逐文件复制/移动并更新 `kb_id/rel_path` → B 更新 payload → `committed`；`move` 成功后删源库；失败按 journal 逆序回滚。
+- **重构**：由 `kb://rebuild-required` 触发 → 冻结 watcher → 清 cache、重解析/嵌入 → B 重建索引 → 更新 `index_version` → 解冻；断点记在 `rebuild_state`，可续跑。
 
 ---
 
-## 8. 兼容性与废弃
+## 8. 兼容性
 
-1. 同一 MAJOR 内：新增命令/事件/可选字段必须保持旧客户端可用；旧字段只标记废弃不删除。
-2. `contract_version` 提升时，`app_info` 立即反映；前端启动检查 `contract_version` 与生成 client 一致，不一致提示重装（避免 Tauri IPC 类型漂移）。
-3. sidecar 协议与 `contract_version` 解耦，但 `app_info` 同时返回 `parser_protocol_version`。
+1. 同一 MAJOR 内新增命令/事件/可选字段必须保持旧客户端可用；旧字段标记废弃不删除。
+2. 前端启动校验 `app_info.contract_version` 与生成 client 一致，不一致提示重装。
+3. sidecar 协议与契约版本解耦，`app_info` 同时返回 `parser_protocol_version`。
 4. 废弃项需在 `contracts/CHANGELOG.md` 标注 `deprecated_since` 与移除版本，并在 `decisions.md` 留 DEC。

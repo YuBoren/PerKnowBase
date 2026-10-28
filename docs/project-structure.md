@@ -2,7 +2,7 @@
 
 > 状态：**规划稿，不含实现代码**。第 0 周只建目录、空 crate 与文档指针；实现按第 1 周起的进度表推进。
 > 依据：`立项报告草稿.md` 四层架构 + `contracts/architecture-boundaries.md` 依赖矩阵 + `任务分工建议.md` 所有权。
-> 目标：四个人 + 四个 Agent 在独立 worktree 里，**不读对方代码也能确定自己的文件该放哪**。
+> 目标：四个人在各自分支上，**不读对方代码也能确定自己的文件该放哪**。
 
 ---
 
@@ -13,7 +13,7 @@ PerKnowBase/
 ├─ AGENTS.md                     # 智能体入口（只指路，不写规则正文）
 ├─ 立项报告草稿.md                # 需求/验收 SSOT
 ├─ 任务分工建议.md                # 所有权与节奏
-├─ decisions.md                  # 异步决策日志（跨 worktree 上下文）
+├─ decisions.md                  # 异步决策日志（跨分支/跨 Agent 上下文）
 ├─ contracts/                    # 接口/数据/边界契约（宪法）
 │  ├─ README.md
 │  ├─ interface-contracts.md
@@ -24,7 +24,7 @@ PerKnowBase/
 ├─ docs/
 │  ├─ project-structure.md       # 本文件
 │  ├─ acceptance-traceability.md # FR→验收→责任人→契约/测试 追溯矩阵（立项报告“目标达成判定”第 7 条）
-│  └─ decisions/                 # 决策日志季度归档（decisions/archive-YYYY.md，见 decisions.md §1.6）
+│  └─ decisions/                 # 决策日志按年归档（见 decisions.md §1.3）
 ├─ crates/                       # Rust workspace（后端全部逻辑）
 ├─ apps/
 │  ├─ desktop/                   # Tauri 壳（A）
@@ -262,7 +262,7 @@ CI 作业（`.github/workflows/ci.yml`）：`fmt+clippy+test` → `tsc+lint+unit
 | `package.json` + `pnpm-workspace.yaml` | `apps/ui` 单包；scripts：`dev/build/typecheck/lint/test/gen` |
 | `.editorconfig` / `.gitattributes` | LF、UTF-8；`*.png` 二进制；`*.sql` diff 友好 |
 | `.gitignore` | `target/`、`node_modules/`、`.tmp`、`*.snapshot`、`fixtures/remote/*`、`python .venv` |
-| `.github/PULL_REQUEST_TEMPLATE.md` | 必填 `Affects:` `DEC:` `Contract-Version:`；§8.2 自检清单 |
+| `.github/PULL_REQUEST_TEMPLATE.md` | 必填 `Affects:` `DEC:` `Contract-Version:`；自检清单见 `contracts/architecture-boundaries.md` §8.2 |
 | `LICENSES/THIRD-PARTY.md` | 依赖 → 版本 → 许可 → 用途；新增依赖必须登记 |
 
 ---
@@ -274,7 +274,7 @@ CI 作业（`.github/workflows/ci.yml`）：`fmt+clippy+test` → `tsc+lint+unit
 3. **B**：`contracts/data-model.md` §3 索引段与 `crates/index` 空 trait 实现骨架。
 4. **C**：`python/parsers` 的 `protocol.py` + 黄金报文样例（先跑通 stdio echo，不做真实解析）。
 5. **D**：`apps/ui` 壳 + 路由 + `gen-types` 产物接入 + 一个假数据页面（验证 IPC 端到端）。
-6. **全员**：合入契约 PR（`contract_version=0.1.0`），再各自开 worktree 写实现。
+6. **全员**：合入契约 PR（`contract_version=0.1.0`），再各自在分支上写实现。
 
 **Phase-0 完成判据**：`cargo build` 通过、`pnpm build` 通过、CI 全绿、`app_info` 能返回 `contract_version`、四个校验脚本能在无违规时通过并在故意违规时报错。
 
@@ -284,10 +284,10 @@ CI 作业（`.github/workflows/ci.yml`）：`fmt+clippy+test` → `tsc+lint+unit
 
 | 项 | 约定 |
 |---|---|
-| 分支 | `main` 受保护；工作分支 `feat/<模块>-<主题>`、`fix/…`、`contract/…`，前缀带 owner 字母（`a/`、`b/`…）可选 |
-| worktree | 每人一个：`../wt-a`、`../wt-b`…；**禁止**在共享目录直接开工 |
+| 分支 | 各自 clone 后开分支；`main` 受保护；`feat/<owner>-<主题>`、`fix/…`、`contract/…`、`dec/…` |
+| worktree | 仅同一人用多个 Agent 并行改多个功能时使用；跨机器协作不需要 |
 | commit | Conventional Commits + trailer `Agent-Task:`、`Agent-Decision:`；一条 commit 一件事 |
-| 文件放置 | 新公共组件先放 `components/`；新表先改 `contracts/data-model.md`；新命令先改 §4 |
+| 文件放置 | 新公共组件先放 `components/`；新表先改 `data-model.md`；新命令先改 `interface-contracts.md` §4 |
 | 命名 | Rust `snake_case` 模块/函数、`CamelCase` 类型；TS 组件 `PascalCase`、hooks `useXxx`；文件 `kebab-case` |
 | 禁止 | 在 `apps/ui` 里手写 IPC 类型；在 `crates/*` 里 `unwrap`；提交 `.env`/密钥/大样例 |
 | 依赖新增 | 先 `DEC` → 再 `LICENSES/` → 再 `Cargo.toml`/`package.json` |
