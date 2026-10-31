@@ -1,0 +1,20 @@
+# perknow-storage — L2（owner：A）
+# 允许依赖：`perknow-contracts`、`perknow-core`
+# 禁止依赖：`tauri`、`qdrant-client`、`tantivy`、`ort`、任一 L3（BAN-03）
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-storage"
+description = "SQLite 连接与 PRAGMA、迁移执行与账本、`MetadataRepo`/`AppRepo` 端口与实现、事务边界（唯一 SQL 出口）。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+perknow-contracts = { workspace = true }
+perknow-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+rusqlite = { workspace = true }

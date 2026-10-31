@@ -70,6 +70,8 @@
 
 | 编号 | 标题 | 状态 | 影响 | 契约版本 |
 |---|---|---|---|---|
+| DEC-20261031-26 | `BlockType` 取值大小写：以字面为准（代码型枚举报大写） | Proposed | C、A、B | 0.1.0 |
+| DEC-20261031-25 | Qdrant 进程契约补全（PX-01） | Proposed | B、A、C | 0.1.0 |
 | DEC-20261031-24 | `migrations` 范围澄清与文档补齐 | Accepted | 全员 | — |
 | DEC-20261030-23 | AGENTS 精简与工程结构变更约束 | Accepted | 全员 | — |
 | DEC-20261030-22 | 契约撰写分工：A 主笔、B/C/D 审核；任务分工表述口径 | Accepted | 全员 | 0.1.0 |
@@ -99,6 +101,49 @@
 
 ## 4. 决策详情（最新在上）
 
+### DEC-20261031-26 `BlockType` 取值大小写：以 §2.4 字面为准（代码型枚举报大写）
+
+- 日期：2026-10-31　决策者：A　状态：Proposed　契约版本：0.1.0（预冻结补齐）
+- 影响：C（sidecar 报文）、B（索引 payload 不涉块类型）、A（类型定义）　通知：@C @B @A @D　确认：A 已裁决，**待 C 确认**　关联：`data-model.md` §2.4、`contracts/README.md` §4、`crates/contracts/src/parse.rs`
+
+**决策**：`BlockType` 线上取值按 `data-model.md` §2.4 字面用**大写**：`TEXT|TITLE|TABLE|CODE|IMAGE|LIST`；`ParseWarning.code` 同样大写。判定标准：**代码型枚举**（错误码、警告码、块类型）用大写，**业务状态/类别枚举**（`KbStatus`、`FileKind`、`ChunkType`、`SearchMode` 等）用小写。`contracts/README.md` §4 已补这条例外。
+
+**理由**：§2.4 与 §4 字面冲突，必须选一个。sidecar 报文一旦定下大小写，再改就是 MAJOR 且波及 C 的黄金报文与 Python 实现；选字面（大写）只需在 §4 补一句例外。
+
+**影响**：
+- [x] `crates/contracts/src/parse.rs`：`BlockType`/`ParseWarningCode` 按大写实现
+- [x] `contracts/README.md` §4 补“代码型枚举报大写”例外
+- [ ] C：`python/parsers` 输出大写块类型，PC-02 黄金报文同步（截止 W1）
+
+**回滚**：改小写需 MAJOR + 迁移 sidecar 报文与索引 payload；成本高，建议本轮确认后不再改。
+
+---
+### DEC-20261031-25 Qdrant 进程契约补全（PX-01）
+
+- 日期：2026-10-31　决策者：A（起草）　状态：Proposed　契约版本：0.1.0（预冻结补齐，无字段变更）
+- 影响：B（`crates/index` 实现）、A（打包与安装布局）、C（写入联调）　通知：@B @A @C @D　确认：A 已起草，**待 B 确认**　关联：DEC-20261026-06、`data-model.md` §3.1/§3.1.1、任务看板 PX-01
+
+**决策**：把原先只有一行“单进程 + 随机端口”的 Qdrant 契约补成可实现的进程契约（新增 §3.1.1），明确七件事：
+① 二进制位置 `<app_data>/qdrant/bin/qdrant`、每次启动覆盖写 `config.yaml`、只用 HTTP REST、必须绑回环地址；
+② 端口回退 6333 → 6333..6342 → 系统分配；选定端口写 `runtime.json`（唯一运行期来源，不得进 `files/`、事件载荷、日志正文）；
+③ 单实例：`lock` 排他锁 + `runtime.json` 探活；取不到锁先复用已有进程，残留锁可接管，绝不双进程共用 `storage`；
+④ 就绪 `/readyz`（200ms × 30s）、健康 `/healthz`（10s，连续 3 次失败），失败置 `index_status=stale` 并发 `index://status`；
+⑤ 重启退避 1s/2s/4s、5 分钟窗口最多 3 次；期间批次失败置 `partial_failed`，已成功批次不重放；
+⑥ 关闭：SIGTERM（Windows `taskkill` 不带 `/F`）等 10s 落盘；空闲 30 分钟回收；
+⑦ 数据目录迁移 5 步、旧目录保留 `storage.bak.<yyyymmdd>` 7 天；版本升级按“格式兼容/不兼容”两条路径，不支持降级。
+
+**理由**：B 的索引实现与 C 的写入联调都卡在“端口怎么定、失败怎么退、谁能重启”；不写清只能各写一套。
+本次只补齐既有行为，不改字段/命令/事件，属文档明确化；因此不升 MAJOR。
+
+**影响**：
+- [x] `contracts/data-model.md`：§3.1 进程行 + 新增 §3.1.1
+- [x] `contracts/CHANGELOG.md` 记录本次补齐
+- [ ] B：实现 `crates/index` 时按 §3.1.1 落地，并在 PR 里逐条勾选（截止 W2）
+- [ ] A：打包流程按“二进制位置 / 版本记录 / 升级快照”三条对齐（截止 W5）
+
+**回滚**：仅文档。若 B 的实现选择不同（例如固定端口、不用 `runtime.json`），改回本节并另写 DEC 说明取舍。
+
+---
 ### DEC-20261031-24 `migrations` 范围澄清与文档补齐
 
 - 日期：2026-10-31　决策者：A　状态：Accepted　契约版本：—

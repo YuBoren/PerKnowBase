@@ -1,0 +1,14 @@
+{
+  "name": "kb://op-done",
+  "payload": {
+    "op_id": "0199a1f0-aaaa-7c3a-9d2e-000000000002",
+    "kb_id": "0199a1f0-1111-7c3a-9d2e-000000000001",
+    "kind": "kb_create",
+    "status": "succeeded",
+    "result": {
+      "files": 120,
+      "chunks": 3400
+    },
+    "error": null
+  }
+}

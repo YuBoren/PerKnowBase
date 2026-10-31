@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/*.rs.bk
+# Node / pnpm
+node_modules/
+.pnpm-store/
+apps/ui/dist/
+# 本地构建/运行产物
+.tmp/
+*.snapshot
+*.log
+# 数据库与密钥（绝不入库）
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+.env
+.env.*
+*.pem
+# 大样例（>1MB 放 fixtures/remote/README.md 说明获取方式）
+tests/integration/fixtures/remote/*
+tests/e2e/artifacts/
+# Python sidecar
+__pycache__/
+*.pyc
+.venv/
+# 编辑器/系统
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

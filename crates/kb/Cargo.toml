@@ -1,0 +1,16 @@
+# perknow-kb — L3（owner：A）
+# 允许依赖：`contracts`、`core`、`storage`、`pipeline`、`index`、`fs`、`settings`、`sync`
+# 禁止依赖：`tauri`、`perknow-search`（禁止编排检索）
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-kb"
+description = "`KnowledgeBaseService`：建库/打开/切换/关闭/删除、导入导出、融合与回滚、重构编排。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+perknow-contracts = { workspace = true }
+perknow-core = { workspace = true }

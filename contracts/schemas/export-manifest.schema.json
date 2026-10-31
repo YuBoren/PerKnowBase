@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perknowbase.local/schemas/export-manifest.schema.json",
+  "title": "export-manifest",
+  "description": "导出包清单 manifest.json。布局与字段见 contracts/data-model.md §2.12/§6；Rust 类型见 crates/contracts/src/export.rs（ExportManifest）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "format_version",
+    "contract_version",
+    "schema_version",
+    "app_version",
+    "created_at",
+    "kb",
+    "index",
+    "files",
+    "counts",
+    "includes_cache",
+    "checksums"
+  ],
+  "properties": {
+    "format": {
+      "const": "perknowbase.kb"
+    },
+    "format_version": {
+      "const": 1
+    },
+    "contract_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "app_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kb_id",
+        "name",
+        "created_at",
+        "settings_snapshot"
+      ],
+      "properties": {
+        "kb_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "settings_snapshot": {
+          "type": "object",
+          "description": "KbSettings 快照，结构见 kb-settings.schema.json（跨文件引用，校验时按对象处理）。"
+        }
+      }
+    },
+    "index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine",
+        "collection",
+        "vector_model",
+        "dim",
+        "index_version",
+        "tantivy"
+      ],
+      "properties": {
+        "engine": {
+          "const": "qdrant"
+        },
+        "collection": {
+          "type": "string",
+          "pattern": "^kb_[0-9a-f]{32}$"
+        },
+        "vector_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dim": {
+          "enum": [
+            128,
+            256,
+            512,
+            768
+          ]
+        },
+        "index_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tantivy": {
+          "type": "boolean"
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rel_path",
+          "size",
+          "content_hash",
+          "mtime"
+        ],
+        "properties": {
+          "rel_path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
+            "description": "POSIX 相对路径，相对 files/"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "content_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "mtime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "chunks",
+        "vectors"
+      ],
+      "properties": {
+        "files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chunks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "vectors": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "includes_cache": {
+      "type": "boolean"
+    },
+    "checksums": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "file"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "file": {
+          "const": "checksums.sha256"
+        }
+      }
+    }
+  }
+}

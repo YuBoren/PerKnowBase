@@ -1,0 +1,16 @@
+# perknow-sync — L3（owner：C）
+# 允许依赖：`contracts`、`core`、`storage`、`pipeline`、`index`、`fs`
+# 禁止依赖：`tauri`、`kb`、`search`、`llm`、`history`
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-sync"
+description = "`SyncService`：`notify` 监听、去抖 500ms、`SyncRouter` 纯路由、增量任务执行与幂等。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+perknow-contracts = { workspace = true }
+perknow-core = { workspace = true }

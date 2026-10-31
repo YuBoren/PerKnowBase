@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "最小权限：只给 core 默认能力。文件打开/资源管理器由 crates/fs 调 OS API，不经过 shell/全量 fs 插件（architecture-boundaries.md §6）。",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -428,12 +428,100 @@
 
 | 项 | 约定 |
 |---|---|
-| 进程 | 单进程，`127.0.0.1:<随机端口>`；数据目录 `<app_data>/qdrant/storage`（DEC-20261026-06） |
+| 进程 | 单进程，`127.0.0.1:<端口>`；数据目录 `<app_data>/qdrant/storage`（DEC-20261026-06）；启动参数、端口回退、单实例、健康/重启、关闭、数据目录迁移见 §3.1.1 |
 | collection | `kb_<kb_id 去掉连字符>`（例 `kb_0199a1f011117c3a...`）；**每库一个** |
 | vector | 命名向量 `content`；`size = KbSettings.embedding.dim`；`distance = Cosine`；`on_disk = true` |
 | point id | `chunk_id`（UUID 字符串） |
 | HNSW | `m=16, ef_construct=100`；查询 `hnsw_ef=64`；可按 P-01 调优但需记录 |
 | 写入 | 批量 `upsert`，批大小 64；`wait=true`（保证读己写） |
+
+### 3.1.1 Qdrant 进程契约（A 起草、B 审核；PX-01）
+
+> `crates/index` 独占进程生命周期与连接串；其他 crate 不得 spawn 或连接（BAN-04）。
+> A 只负责把二进制打进安装包并确定安装布局，不参与连接管理。
+
+**二进制与配置**
+
+| 项 | 约定 |
+|---|---|
+| 位置 | `<app_data>/qdrant/bin/qdrant(.exe)`，随应用安装包分发 |
+| 配置 | 每次启动覆盖写 `<app_data>/qdrant/config/config.yaml`（生成物，禁止手改） |
+| 关键项 | `storage.storage_path`、`service.host=127.0.0.1`、`service.http_port`、`telemetry_disabled=true`、`log_level=WARN` |
+| 协议 | 只用 HTTP REST（不启用 gRPC）；不设 API key，但**必须**绑定回环地址，禁止 0.0.0.0（NFR-10） |
+
+**端口选择与回退**
+
+1. 首选 6333。
+2. 被占用 → 顺序尝试 6333..6342。
+3. 仍失败 → 由系统分配空闲端口（bind 0 取端口后立即释放，再交给 Qdrant）。
+4. 选定端口写入 `<app_data>/qdrant/runtime.json`：`{port, pid, version, started_at, storage_path}`；进程正常退出时删除。
+   `runtime.json` 是**唯一**运行期端口来源：端口不得写入 `files/`、事件载荷或日志正文（BAN-16）。
+
+**单实例**
+
+- 启动前对 `<app_data>/qdrant/lock` 取排他文件锁。
+- 取不到锁 → 读 `runtime.json` 并探活 `/readyz`：
+  - 成功：复用已有进程（另一个窗口或上次未退干净），**不启动第二个**；
+  - 失败：等 5 秒重试一次；仍失败 → `INDEX_UNAVAILABLE`，错误 `details` 只带 `pid`/`port`，提示用户结束残留进程。
+- 残留锁判定：进程不存在（pid 不在 / 锁可获取）即视为残留，接管并覆盖 `runtime.json`。
+- **永不**让两个 Qdrant 指向同一 `storage`：Qdrant 自身也会因目录锁失败，但必须先判断，避免把“占用中”误报成数据损坏。
+
+**就绪与健康**
+
+| 项 | 约定 |
+|---|---|
+| 就绪探针 | `GET /readyz`，间隔 200ms，超时 30s（首次启动含目录初始化）；超时则杀进程并报 `INDEX_UNAVAILABLE` |
+| 运行期健康 | 每 10s `GET /healthz`；连续 3 次失败进入重启流程，并把该库 `index_status` 置 `stale`（§5.2） |
+| 对外表达 | 通过 `index://status` 事件 `state=stale\|indexing\|idle`，载荷不含端口（§5 规则 2） |
+
+**重启与退避**
+
+- 触发：进程退出、探活连续失败、单请求连续超时 3 次。
+- 退避：1s → 2s → 4s，**5 分钟窗口内最多 3 次**；仍失败 → `INDEX_UNAVAILABLE`，停止自动重启，等下一次显式操作或 10 分钟冷却后重置计数。
+- 重启期间进行中的索引写入按批失败，任务置 `partial_failed`；已成功批次**不重放**（`chunk_id` 幂等键保证重放安全）。
+
+**关闭**
+
+- 应用退出：先停止新请求并 flush 在途批次，再发 SIGTERM（Windows 用 `taskkill /PID <pid>`，**不带** /F），等待最长 10s 落盘；超时才强杀。
+- 空闲回收：无在途请求且无打开的知识库超过 30 分钟 → 优雅关闭；下次需要时冷启动，UI 通过 `index://status` 的 `stale → indexing` 感知恢复。
+
+**数据目录迁移**
+
+- `storage_root`（知识库根，`AppSettings.storage`）变更**不影响** Qdrant 数据目录：`<app_data>/qdrant/storage` 始终跟随应用数据目录。
+- 仅“应用数据目录整体搬迁”或“目录布局升级”需要迁移，步骤固定：
+  1. 关闭进程，确认 `runtime.json` 已删除、`lock` 可获取；
+  2. 复制/移动到新目录（同盘用原子 rename，跨盘用“复制→校验→删旧”）；
+  3. 启动新目录并 probe `/collections`，逐 collection 校验 `points_count`；
+  4. 旧目录保留为 `storage.bak.<yyyymmdd>`，7 天后清理；
+  5. 任一步失败 → 回滚到旧目录并返回 `IO_ERROR`（不得留下半迁移目录被当作文档使用）。
+- 迁移**不**改变 payload 结构；需要重建索引时走 `RebuildPlan`（DEC-20261026-05）。
+
+**版本升级**
+
+| 升级类型 | 动作 |
+|---|---|
+| storage 格式兼容（通常 MINOR/PATCH） | 直接启动，启动后 probe `/collections` 校验数量 |
+| 格式不兼容 / MAJOR | 旧版本逐 collection 导出快照 → 新版本空目录 → 恢复快照 → 校验 `points_count` → 更新 `runtime.json.version` |
+| 失败 | 恢复旧二进制与旧目录，返回 `INDEX_UNAVAILABLE`，`index_status=stale` |
+
+**不支持降级**：Qdrant 不保证向下兼容；安装包回滚需连同 `storage` 快照一起回滚（由 A 的打包流程负责）。
+
+**失败语义**
+
+| 场景 | code | retryable | 附加行为 |
+|---|---|---|---|
+| 二进制缺失/不可执行 | `INDEX_UNAVAILABLE` | true | 提示“安装不完整”，不重试 |
+| 端口全被占用 | `INDEX_UNAVAILABLE` | true | `details` 记录尝试范围 |
+| 就绪超时 | `INDEX_UNAVAILABLE` | true | 杀进程，保留脱敏日志片段 |
+| `storage` 不可写 | `IO_ERROR` | true | 不启动进程 |
+| collection/payload 与元数据不一致 | `INDEX_VERSION_MISMATCH` | false | 提示重建索引 |
+
+**禁止**
+
+- A/C/前端直接连接 Qdrant 或读写其数据文件（BAN-02/BAN-04）。
+- 端口、数据目录进 `files/`、事件载荷、日志正文（BAN-16）。
+- 两个 PerKnowBase 实例共用同一 `<app_data>`（Tauri 单实例 + `lock` 双保险）。
+- 在 `crates/index` 之外 spawn `qdrant`。
 
 **payload**（字段名即契约；新增需 MINOR）：
 
@@ -663,7 +751,7 @@
 | `kb_id_src` / `kb_id_dst` | TEXT | NOT NULL |
 | `action` | TEXT | NOT NULL |
 | `source_path` / `target_path` | TEXT | NULL |
-| `status` | TEXT | NOT NULL（`MergeJournalStatus`） |
+| `status` | TEXT | NOT NULL（**条目级** `MergeJournalEntryStatus`：`planned`/`done`/`rolled_back`；整体状态在 `merge_op.status`） |
 | `created_at` | INTEGER | NOT NULL |
 
 索引：`UNIQUE(op_id, seq)`。

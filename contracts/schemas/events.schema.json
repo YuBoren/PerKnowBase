@@ -1,0 +1,571 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perknowbase.local/schemas/events.schema.json",
+  "title": "events",
+  "description": "事件载荷（contracts/interface-contracts.md §5）。一个文件描述“一条事件”：{name, payload}。订阅方必须容忍未知字段与未知 phase 字符串。",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/sync_progress"
+    },
+    {
+      "$ref": "#/$defs/index_status"
+    },
+    {
+      "$ref": "#/$defs/kb_changed"
+    },
+    {
+      "$ref": "#/$defs/kb_op_progress"
+    },
+    {
+      "$ref": "#/$defs/kb_op_done"
+    },
+    {
+      "$ref": "#/$defs/kb_rebuild_required"
+    },
+    {
+      "$ref": "#/$defs/error_toast"
+    }
+  ],
+  "$defs": {
+    "op_kind": {
+      "enum": [
+        "kb_create",
+        "kb_import",
+        "kb_export",
+        "kb_merge",
+        "kb_delete",
+        "kb_rebuild",
+        "fs_refresh"
+      ]
+    },
+    "op_status": {
+      "enum": [
+        "running",
+        "succeeded",
+        "partial_failed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "payload"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "订阅方容忍未知字段"
+        }
+      }
+    },
+    "sync_progress": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        }
+      ],
+      "properties": {
+        "name": {
+          "const": "sync://progress"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "kb_id",
+            "task_id",
+            "phase",
+            "done",
+            "total"
+          ],
+          "properties": {
+            "kb_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "phase": {
+              "type": "string",
+              "description": "订阅方必须容忍未知 phase"
+            },
+            "done": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "0 表示未知"
+            },
+            "current_path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "index_status": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        }
+      ],
+      "properties": {
+        "name": {
+          "const": "index://status"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "kb_id",
+            "indexed",
+            "total",
+            "failed",
+            "state"
+          ],
+          "properties": {
+            "kb_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "indexed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "state": {
+              "enum": [
+                "idle",
+                "indexing",
+                "stale"
+              ]
+            },
+            "last_error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "kb_changed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        }
+      ],
+      "properties": {
+        "name": {
+          "const": "kb://changed"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "kb_id",
+            "what"
+          ],
+          "properties": {
+            "kb_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "what": {
+              "enum": [
+                "meta",
+                "settings",
+                "files",
+                "index"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "kb_op_progress": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        }
+      ],
+      "properties": {
+        "name": {
+          "const": "kb://op-progress"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "op_id",
+            "kb_id",
+            "kind",
+            "phase",
+            "done",
+            "total"
+          ],
+          "properties": {
+            "op_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kb_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "$ref": "#/$defs/op_kind"
+            },
+            "phase": {
+              "type": "string"
+            },
+            "done": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "kb_op_done": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        }
+      ],
+      "properties": {
+        "name": {
+          "const": "kb://op-done"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "op_id",
+            "kb_id",
+            "kind",
+            "status"
+          ],
+          "properties": {
+            "op_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kb_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "$ref": "#/$defs/op_kind"
+            },
+            "status": {
+              "$ref": "#/$defs/op_status"
+            },
+            "result": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/app_error"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "kb_rebuild_required": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        }
+      ],
+      "properties": {
+        "name": {
+          "const": "kb://rebuild-required"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "kb_id",
+            "plan"
+          ],
+          "properties": {
+            "kb_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "plan": {
+              "$ref": "#/$defs/rebuild_plan"
+            }
+          }
+        }
+      }
+    },
+    "error_toast": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        }
+      ],
+      "properties": {
+        "name": {
+          "const": "error://toast"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "code",
+            "message",
+            "retryable",
+            "correlation_id"
+          ],
+          "properties": {
+            "code": {
+              "enum": [
+                "KB_NOT_FOUND",
+                "KB_ALREADY_OPEN",
+                "KB_BUSY",
+                "KB_CORRUPTED",
+                "KB_SCHEMA_TOO_NEW",
+                "PATH_NOT_FOUND",
+                "PATH_OUTSIDE_KB",
+                "PATH_CONFLICT",
+                "FILE_LOCKED",
+                "PARSE_FAILED",
+                "PARSE_UNSUPPORTED",
+                "PARSER_UNAVAILABLE",
+                "EMBED_FAILED",
+                "MODEL_NOT_READY",
+                "INDEX_UNAVAILABLE",
+                "INDEX_VERSION_MISMATCH",
+                "SEARCH_INVALID_REQUEST",
+                "SEARCH_CANCELLED",
+                "LLM_NOT_CONFIGURED",
+                "LLM_AUTH_FAILED",
+                "LLM_RATE_LIMITED",
+                "LLM_TIMEOUT",
+                "LLM_RESPONSE_INVALID",
+                "SETTINGS_INVALID",
+                "EXPORT_INVALID",
+                "EXPORT_VERSION_UNSUPPORTED",
+                "SYNC_IN_PROGRESS",
+                "CANCELLED",
+                "IO_ERROR",
+                "INTERNAL"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "context": {
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "rebuild_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kb_id",
+        "op_id",
+        "reason",
+        "reasons_detail",
+        "steps",
+        "affected_files",
+        "eta_ms",
+        "requires_confirm"
+      ],
+      "properties": {
+        "kb_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "op_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "enum": [
+            "chunk_strategy",
+            "embedding_model",
+            "parse_mode",
+            "index_corrupt",
+            "manual"
+          ]
+        },
+        "reasons_detail": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "field",
+              "old",
+              "new"
+            ],
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "old": {
+                "type": "string"
+              },
+              "new": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "clear_cache",
+              "reparse",
+              "rechunk",
+              "reembed",
+              "reindex",
+              "verify"
+            ]
+          }
+        },
+        "affected_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "eta_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requires_confirm": {
+          "type": "boolean"
+        }
+      }
+    },
+    "app_error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "details",
+        "retryable",
+        "correlation_id",
+        "user_message_key"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "KB_NOT_FOUND",
+            "KB_ALREADY_OPEN",
+            "KB_BUSY",
+            "KB_CORRUPTED",
+            "KB_SCHEMA_TOO_NEW",
+            "PATH_NOT_FOUND",
+            "PATH_OUTSIDE_KB",
+            "PATH_CONFLICT",
+            "FILE_LOCKED",
+            "PARSE_FAILED",
+            "PARSE_UNSUPPORTED",
+            "PARSER_UNAVAILABLE",
+            "EMBED_FAILED",
+            "MODEL_NOT_READY",
+            "INDEX_UNAVAILABLE",
+            "INDEX_VERSION_MISMATCH",
+            "SEARCH_INVALID_REQUEST",
+            "SEARCH_CANCELLED",
+            "LLM_NOT_CONFIGURED",
+            "LLM_AUTH_FAILED",
+            "LLM_RATE_LIMITED",
+            "LLM_TIMEOUT",
+            "LLM_RESPONSE_INVALID",
+            "SETTINGS_INVALID",
+            "EXPORT_INVALID",
+            "EXPORT_VERSION_UNSUPPORTED",
+            "SYNC_IN_PROGRESS",
+            "CANCELLED",
+            "IO_ERROR",
+            "INTERNAL"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_message_key": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

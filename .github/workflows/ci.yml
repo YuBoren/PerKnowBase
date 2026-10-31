@@ -1,0 +1,121 @@
+# CI 闸门（contracts/architecture-boundaries.md §8.1；顺序见 AGENTS.md §8）
+#
+# 全部为 required checks。Phase-0 阶段有些作业会因为对象尚未建立而自动跳过：
+#   - ui：apps/ui/package.json 尚未创建（D 的 PD-02）
+#   - gen-diff：scripts/gen-types.ps1 尚未创建（D 的 PD-03）
+#   - integration-smoke：tests/integration 还没有用例（D 牵头）
+# 跳过是显式的（if 条件），不是永久豁免；对象建立后自动开始执行。
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust:
+    name: rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux system deps (Tauri 2)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo fmt
+        run: cargo fmt --all --check
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace
+
+  contracts:
+    name: contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install jsonschema
+        run: python -m pip install --upgrade jsonschema
+      - name: validate contracts
+        run: pwsh -NoProfile -File scripts/validate-contracts.ps1
+
+  guards:
+    name: guards (deps / boundaries / migrations / licenses)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: check deps
+        run: pwsh -NoProfile -File scripts/check-deps.ps1
+      - name: check boundaries
+        run: pwsh -NoProfile -File scripts/check-boundaries.ps1
+      - name: check migrations
+        run: pwsh -NoProfile -File scripts/check-migrations.ps1
+      - name: check licenses
+        run: pwsh -NoProfile -File scripts/check-licenses.ps1
+
+  ui:
+    name: ui (tsc / lint / unit)
+    if: ${{ hashFiles('apps/ui/package.json') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir apps/ui typecheck
+      - run: pnpm --dir apps/ui lint
+      - run: pnpm --dir apps/ui test
+
+  gen-diff:
+    name: generated client is up to date
+    if: ${{ hashFiles('scripts/gen-types.ps1') != '' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: regenerate
+        run: pwsh -NoProfile -File scripts/gen-types.ps1
+      - name: diff must be empty
+        run: git diff --exit-code apps/ui/src/lib/tauri-api
+
+  integration-smoke:
+    name: integration smoke
+    if: ${{ hashFiles('tests/integration/**/*.rs') != '' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace --test '*' -- --nocapture

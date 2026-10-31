@@ -1,0 +1,527 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perknowbase.local/schemas/sidecar.schema.json",
+  "title": "sidecar",
+  "description": "Rust ↔ Python sidecar 的 NDJSON JSON-RPC 帧（contracts/interface-contracts.md §6）。每行一个 JSON 对象；本 schema 描述“一行”的三种形态：请求 / 成功响应 / 错误响应。解析产物字段见 contracts/data-model.md §2.4。",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/success"
+    },
+    {
+      "$ref": "#/$defs/failure"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "method": {
+          "enum": [
+            "initialize",
+            "health",
+            "parse_file",
+            "cancel",
+            "shutdown"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "各方法参数见 interface-contracts.md §6.2"
+        }
+      }
+    },
+    "success": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "error"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "integer",
+              "description": "-32001/-32002/-32010/-32011/-32012/-32099"
+            },
+            "message": {
+              "type": "string"
+            },
+            "data": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "含 app_code/retryable/file_id/reason/page 等"
+            }
+          }
+        }
+      }
+    },
+    "source_location": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "line_start",
+            "line_end",
+            "col_start",
+            "col_end"
+          ],
+          "properties": {
+            "kind": {
+              "const": "text"
+            },
+            "line_start": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "line_end": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "col_start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "col_end": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "page",
+            "bbox"
+          ],
+          "properties": {
+            "kind": {
+              "const": "pdf"
+            },
+            "page": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "bbox": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "file"
+          ],
+          "properties": {
+            "kind": {
+              "const": "image"
+            },
+            "file": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "sheet",
+            "row",
+            "col"
+          ],
+          "properties": {
+            "kind": {
+              "const": "table"
+            },
+            "sheet": {
+              "type": "string"
+            },
+            "row": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "col": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cell",
+            "cell_kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "notebook"
+            },
+            "cell": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cell_kind": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "table_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sheet",
+        "rows"
+      ],
+      "properties": {
+        "sheet": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "image_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rel_path"
+      ],
+      "properties": {
+        "rel_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "parse_warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "ENCRYPTED",
+            "PARTIAL",
+            "EMPTY_TEXT",
+            "TOO_LARGE",
+            "OCR_REQUIRED",
+            "FALLBACK"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "source_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/source_location"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_id",
+        "order",
+        "block_type",
+        "text",
+        "source_location",
+        "level",
+        "table",
+        "image",
+        "metadata"
+      ],
+      "properties": {
+        "block_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "block_type": {
+          "enum": [
+            "TEXT",
+            "TITLE",
+            "TABLE",
+            "CODE",
+            "IMAGE",
+            "LIST"
+          ]
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_location": {
+          "$ref": "#/$defs/source_location"
+        },
+        "level": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/table_data"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "image": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/image_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "metadata": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    },
+    "parsed_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file_id",
+        "rel_path",
+        "kind",
+        "parser",
+        "blocks",
+        "warnings",
+        "page_count",
+        "cache_path",
+        "parsed_at",
+        "elapsed_ms"
+      ],
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rel_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "markdown",
+            "pdf",
+            "docx",
+            "html",
+            "csv",
+            "xlsx",
+            "json",
+            "notebook",
+            "code",
+            "image",
+            "other"
+          ]
+        },
+        "parser": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "mode"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string"
+            }
+          }
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parse_warning"
+          }
+        },
+        "page_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cache_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "绝对路径，仅内部使用；示例中为 null 以避免提交机器相关路径（BAN-19）"
+        },
+        "parsed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "error_codes": {
+      "enum": [
+        "KB_NOT_FOUND",
+        "KB_ALREADY_OPEN",
+        "KB_BUSY",
+        "KB_CORRUPTED",
+        "KB_SCHEMA_TOO_NEW",
+        "PATH_NOT_FOUND",
+        "PATH_OUTSIDE_KB",
+        "PATH_CONFLICT",
+        "FILE_LOCKED",
+        "PARSE_FAILED",
+        "PARSE_UNSUPPORTED",
+        "PARSER_UNAVAILABLE",
+        "EMBED_FAILED",
+        "MODEL_NOT_READY",
+        "INDEX_UNAVAILABLE",
+        "INDEX_VERSION_MISMATCH",
+        "SEARCH_INVALID_REQUEST",
+        "SEARCH_CANCELLED",
+        "LLM_NOT_CONFIGURED",
+        "LLM_AUTH_FAILED",
+        "LLM_RATE_LIMITED",
+        "LLM_TIMEOUT",
+        "LLM_RESPONSE_INVALID",
+        "SETTINGS_INVALID",
+        "EXPORT_INVALID",
+        "EXPORT_VERSION_UNSUPPORTED",
+        "SYNC_IN_PROGRESS",
+        "CANCELLED",
+        "IO_ERROR",
+        "INTERNAL"
+      ]
+    }
+  }
+}

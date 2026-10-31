@@ -1,0 +1,16 @@
+# perknow-llm — L2（owner：B）
+# 允许依赖：`perknow-contracts`、`perknow-core`
+# 禁止依赖：`tauri`、`rusqlite`、`qdrant-client`、`tantivy`、任一 L3
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-llm"
+description = "OpenAI 兼容客户端、超时/重试/降级、Prompt 渲染工具。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+perknow-contracts = { workspace = true }
+perknow-core = { workspace = true }

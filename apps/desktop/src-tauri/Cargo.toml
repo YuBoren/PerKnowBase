@@ -1,0 +1,25 @@
+# perknow-desktop — L4 外壳（owner：A）
+# 允许依赖：全部 L3 + tauri / tauri-specta；禁止直接依赖 qdrant-client / rusqlite / tantivy / ort。
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-desktop"
+description = "PerKnowBase 桌面壳：命令注册、DTO、错误映射、事件转发"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[lib]
+name = "perknow_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+perknow-contracts = { workspace = true }
+perknow-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { workspace = true }

@@ -1,0 +1,36 @@
+{
+  "chunk": {
+    "strategy": "recursive",
+    "max_chars": 800,
+    "overlap_chars": 120,
+    "code_aware": true
+  },
+  "embedding": {
+    "model_id": "embeddinggemma-2-768",
+    "dim": 768,
+    "batch_size": 16,
+    "image_enabled": true
+  },
+  "parse": {
+    "mineru_mode": "standard",
+    "cache_enabled": true,
+    "keep_cache_on_export": false
+  },
+  "search": {
+    "overrides": {
+      "default_hybrid": {
+        "kind": "hybrid",
+        "weights": {
+          "bm25": 0.5,
+          "vector": 0.5
+        },
+        "rrf_k": 60
+      },
+      "rrf_k": 60
+    }
+  },
+  "created_from": {
+    "app_version": "0.1.0",
+    "contract_version": "0.1.0"
+  }
+}

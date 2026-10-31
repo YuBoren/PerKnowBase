@@ -72,7 +72,7 @@
 | 为什么这么设计 | `decisions.md` |
 | 文件/目录该放哪 | `docs/project-structure.md` |
 | 契约版本现在是多少 | `contracts/README.md` 顶部、`contracts/CHANGELOG.md` |
-| 新增依赖怎么登记 | `contracts/architecture-boundaries.md` §3.2 的 BAN-20；登记到 `LICENSES/`（Phase-0 由 A 创建，清单格式见 `docs/project-structure.md` §7） |
+| 新增依赖怎么登记 | `contracts/architecture-boundaries.md` §3.2 的 BAN-20；登记到 `LICENSES/`（清单格式见 `docs/project-structure.md` §7） |
 
 ---
 

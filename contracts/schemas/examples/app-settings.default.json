@@ -1,0 +1,47 @@
+{
+  "storage": {
+    "storage_root": "/app_data/PerKnowBase/kbs",
+    "history_limit": {
+      "max_items": 500,
+      "max_bytes": 52428800
+    }
+  },
+  "watch": {
+    "interval_secs": 60,
+    "active_sync": true
+  },
+  "search": {
+    "default_hybrid": {
+      "kind": "hybrid",
+      "weights": {
+        "bm25": 0.5,
+        "vector": 0.5
+      },
+      "rrf_k": 60
+    },
+    "top_k": 10,
+    "rrf_k": 60
+  },
+  "display": {
+    "top_k_options": [
+      5,
+      10,
+      20
+    ],
+    "preview_chars": 240
+  },
+  "llm": {
+    "provider": "openai_compat",
+    "base_url": "http://127.0.0.1:11434/v1",
+    "model": "qwen2.5:7b",
+    "timeout_ms": 60000,
+    "max_tokens": null,
+    "has_key": false,
+    "enabled": false
+  },
+  "ui": {
+    "max_tabs": 5,
+    "locale": "zh-CN",
+    "theme": "system"
+  }
+}

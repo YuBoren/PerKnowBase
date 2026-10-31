@@ -1,0 +1,16 @@
+# perknow-index — L2（owner：B）
+# 允许依赖：`perknow-contracts`、`perknow-core`
+# 禁止依赖：`tauri`、`rusqlite`、`perknow-storage`、`perknow-pipeline`（BAN-04/BAN-13）
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-index"
+description = "Qdrant/Tantivy 适配、Qdrant 进程生命周期与端口回退、快照、BM25 分词（唯一索引出口）。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+perknow-contracts = { workspace = true }
+perknow-core = { workspace = true }

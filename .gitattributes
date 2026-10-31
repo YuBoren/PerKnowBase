@@ -1,0 +1,11 @@
+# 换行与二进制判定；避免 Windows 提交把 LF 改成 CRLF 造成全库 diff。
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.woff2 binary
+*.sqlite3 binary
+*.snap binary

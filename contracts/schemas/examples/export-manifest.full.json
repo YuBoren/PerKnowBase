@@ -1,0 +1,75 @@
+{
+  "format": "perknowbase.kb",
+  "format_version": 1,
+  "contract_version": "0.1.0",
+  "schema_version": 1,
+  "app_version": "0.1.0",
+  "created_at": "2026-10-26T05:44:03.123Z",
+  "kb": {
+    "kb_id": "0199a1f0-1111-7c3a-9d2e-000000000001",
+    "name": "光学笔记",
+    "created_at": "2026-10-20T08:00:00.000Z",
+    "settings_snapshot": {
+      "chunk": {
+        "strategy": "recursive",
+        "max_chars": 800,
+        "overlap_chars": 120,
+        "code_aware": true
+      },
+      "embedding": {
+        "model_id": "embeddinggemma-2-768",
+        "dim": 768,
+        "batch_size": 16,
+        "image_enabled": true
+      },
+      "parse": {
+        "mineru_mode": "standard",
+        "cache_enabled": true,
+        "keep_cache_on_export": false
+      },
+      "search": {
+        "overrides": {
+          "default_hybrid": {
+            "kind": "hybrid",
+            "weights": {
+              "bm25": 0.5,
+              "vector": 0.5
+            },
+            "rrf_k": 60
+          },
+          "rrf_k": 60
+        }
+      },
+      "created_from": {
+        "app_version": "0.1.0",
+        "contract_version": "0.1.0"
+      }
+    }
+  },
+  "index": {
+    "engine": "qdrant",
+    "collection": "kb_0199a1f011117c3a9d2e000000000001",
+    "vector_model": "embeddinggemma-2-768",
+    "dim": 768,
+    "index_version": 42,
+    "tantivy": true
+  },
+  "files": [
+    {
+      "rel_path": "optics/a.md",
+      "size": 1234,
+      "content_hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "mtime": "2026-10-25T10:11:12.000Z"
+    }
+  ],
+  "counts": {
+    "files": 1,
+    "chunks": 8,
+    "vectors": 8
+  },
+  "includes_cache": false,
+  "checksums": {
+    "algorithm": "sha256",
+    "file": "checksums.sha256"
+  }
+}

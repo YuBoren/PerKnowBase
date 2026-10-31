@@ -1,0 +1,17 @@
+{
+  "name": "perknowbase",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PerKnowBase monorepo root (pnpm workspace); the app lives in apps/ui",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --dir apps/ui dev",
+    "build": "pnpm --dir apps/ui build",
+    "typecheck": "pnpm --dir apps/ui typecheck",
+    "lint": "pnpm --dir apps/ui lint",
+    "test": "pnpm --dir apps/ui test"
+  }
+}

@@ -22,10 +22,11 @@ PerKnowBase/
 │  ├─ data-model.md
 │  ├─ architecture-boundaries.md
 │  ├─ CHANGELOG.md
-│  └─ schemas/                   # Phase-0 待建：*.schema.json + examples/
+│  └─ schemas/                   # 已建：五件套 *.schema.json + examples/
 ├─ docs/
 │  ├─ project-structure.md       # 本文件
 │  ├─ acceptance-traceability.md # FR→验收→责任人→契约/测试 追溯矩阵（立项报告“目标达成判定”第 7 条）
+│  ├─ contract-review-0.1.0.md   # PX-02 评审记录与签字表
 │  └─ decisions/                 # 决策日志按年归档（见 decisions.md §1.3）
 ├─ crates/                       # Rust workspace（后端全部逻辑）
 ├─ apps/
@@ -64,6 +65,10 @@ PerKnowBase/
 | `crates/sync` | `perknow-sync` | L3 | C | `notify` 监听、去抖、`SyncRouter`、增量任务执行 | `notify` |
 | `crates/search` | `perknow-search` | L3 | B | `SearchService` 三模式编排、`Retriever`（BM25+向量+RRF）、`PromptBuilder` | — |
 | `crates/history` | `perknow-history` | L3 | B | 历史写入/查询/删除/裁剪、软引用快照 | — |
+
+**Phase-0 现状（2026-10-31）**：上表 12 个 crate 目录 + `apps/desktop/src-tauri` 已建空壳（只有 `lib.rs` 文档注释与 `README.md`）；
+其中 `crates/contracts` 已落全部领域类型与版本常量，`crates/core` 已落 ID/时间/哈希/路径/取消/事件/错误工具。
+其余 10 个 crate 的实现按 owner 在 Phase-1 补齐；依赖方向由 `scripts/check-deps.ps1` 强制。
 
 **每个 crate 的固定内部结构**（Phase-1 起）：
 
@@ -106,7 +111,7 @@ crates/storage/migrations/
 
 **不需要迁移的场景**：用户创建/删除/融合知识库、修改设置、切换 LLM——这些是数据或文件操作，结构不变。
 
-**硬规则**：只追加、不改已合入脚本；空库必须能顺序跑通（`scripts/check-migrations`）；只有 A 写脚本，B/C 提表需求（PR）。**当前状态**：Phase-0 尚未创建这些脚本。
+**硬规则**：只追加、不改已合入脚本；空库必须能顺序跑通（`scripts/check-migrations`）；只有 A 写脚本，B/C 提表需求（PR）。**当前状态（2026-10-31）**：两条链的 `0001_init.sql` 已建（app 3 表；kb 12 表 17 索引），由 `scripts/check-migrations.ps1` 在空库上顺序执行并校验，`SCHEMA_VERSION=1` 与 kb 链最高版本一致。
 
 ---
 
@@ -157,8 +162,9 @@ apps/desktop/
 │  ├─ Cargo.toml
 │  ├─ build.rs
 │  ├─ tauri.conf.json
-│  ├─ capabilities/default.json     # 最小权限：仅 core + 必要的 dialog/shell-open
-│  ├─ icons/
+│  ├─ capabilities/default.json     # 最小权限：仅 core（文件打开由 crates/fs 调 OS API）
+│  ├─ icons/                         # Phase-0 占位图标，发布前替换
+│  ├─ placeholder-dist/index.html    # Phase-0 占位前端；apps/ui 落地后改为 ../../ui/dist
 │  └─ src/
 │     ├─ main.rs                    # 启动、单实例、日志、崩溃钩子
 │     ├─ lib.rs                      # AppState（打开中的 KB、服务句柄）、注册
@@ -265,12 +271,15 @@ tests/
 
 | 脚本 | 作用 | owner | 何时跑 |
 |---|---|---|---|
+| `validate-contracts.ps1`（+ `validate-schemas.py`） | 版本四处一致、schema/示例、命令表、错误码、事件名 | A | 每次 PR |
+| `check-deps.ps1` | 解析各 `Cargo.toml` 的依赖声明，对照依赖矩阵 | A | 每次 PR |
+| `check-boundaries.ps1` | 扫描禁用 API（tauri/rusqlite/qdrant_client/tantivy/ort/SQL）与前端 `invoke`/`fetch` | A | 每次 PR |
+| `check-migrations.ps1`（+ `check-migrations.py`） | 空库顺序执行、版本单调、`SCHEMA_VERSION` 一致 | A | 改 storage 时 |
+| `check-licenses.ps1` | 声明的依赖都已登记 `LICENSES/THIRD-PARTY.md` | A | 新增依赖时 |
 | `gen-types.ps1` / `.sh` | Rust→TS 类型与 command client 生成 | D（A 评审） | 改契约后 |
-| `validate-contracts.*` | 版本一致、schema 校验、示例校验 | A | 每次 PR |
-| `check-deps.*` | 解析 `cargo metadata`，对照依赖矩阵 | A | 每次 PR |
-| `check-boundaries.*` | 扫描禁用 import（tauri/rusqlite/qdrant_client/tantivy/ort） | A | 每次 PR |
-| `check-migrations.*` | 空库顺序执行、版本单调 | A | 改 storage 时 |
 | `dev.*` | 一键起 Tauri + Vite + sidecar（开发态） | D | 本地 |
+
+**Phase-0 现状**：前五个脚本已可跑（用法与降级行为见 `scripts/README.md`）；`gen-types` 与 `dev` 由 D 在 Phase-1 提供。
 
 CI 作业（`.github/workflows/ci.yml`）：`fmt+clippy+test` → `tsc+lint+unit` → `contracts` → `gen-diff` → `deps` → `boundaries` → `migrations` → `integration-smoke`。全部为 **required checks**。
 
@@ -299,7 +308,14 @@ CI 作业（`.github/workflows/ci.yml`）：`fmt+clippy+test` → `tsc+lint+unit
 5. **D**：`apps/ui` 壳 + 路由 + `gen-types` 产物接入 + 一个假数据页面（验证 IPC 端到端）。
 6. **全员**：合入契约 PR（`contract_version=0.1.0`），再各自在分支上写实现。
 
-**Phase-0 完成判据**：`cargo build` 通过、`pnpm build` 通过、CI 全绿、`app_info` 能返回 `contract_version`、四个校验脚本能在无违规时通过并在故意违规时报错。
+**Phase-0 完成判据**：`cargo build` 通过、`pnpm build` 通过、CI 全绿、`app_info` 能返回 `contract_version`、五个校验脚本能在无违规时通过并在故意违规时报错。
+
+**当前状态（2026-10-31）**：
+- [x] 步骤 1（A）：目录骨架、workspace `Cargo.toml`、12 个空 crate、`.github/workflows/ci.yml`、`scripts/` 五个校验脚本、`LICENSES/THIRD-PARTY.md`
+- [x] 步骤 2（A）：`crates/contracts` 类型骨架 + `CONTRACT_VERSION`；`crates/core` 的 `EventSink`/`CancelToken`/路径校验/哈希/时间
+- [x] A 的补充项：`crates/storage/migrations/{app,kb}/0001_init.sql`、Tauri 壳骨架（`app_info` + 39 条命令登记）、`contracts/schemas/` 五件套、`docs/contract-review-0.1.0.md`
+- [ ] 步骤 3–5（B/C/D）：索引空 trait、sidecar 协议 echo + 黄金报文、React 壳与生成链
+- [ ] `cargo build` 与 `pnpm build` 未在本机验证（无 crates 缓存 / 无 pnpm），由 CI 与各 owner 分支验证
 
 ---
 

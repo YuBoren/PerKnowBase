@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": "0199a1f0-dddd-7c3a-9d2e-000000000005",
+  "method": "initialize",
+  "params": {
+    "protocol_version": "1.0",
+    "app_version": "0.1.0",
+    "cache_root": "/app_data/PerKnowBase/parsers/cache",
+    "log_level": "info",
+    "max_parallel": 2
+  }
+}

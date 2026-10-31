@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perknowbase.local/schemas/app-settings.schema.json",
+  "title": "app-settings",
+  "description": "应用级设置（app.sqlite3.app_settings.json 单行 JSON）。字段定义见 contracts/data-model.md §2.14，Rust 类型见 crates/contracts/src/settings.rs（AppSettings）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "storage",
+    "watch",
+    "search",
+    "display",
+    "llm",
+    "ui"
+  ],
+  "properties": {
+    "storage": {
+      "$ref": "#/$defs/storage"
+    },
+    "watch": {
+      "$ref": "#/$defs/watch"
+    },
+    "search": {
+      "$ref": "#/$defs/search"
+    },
+    "display": {
+      "$ref": "#/$defs/display"
+    },
+    "llm": {
+      "$ref": "#/$defs/llm"
+    },
+    "ui": {
+      "$ref": "#/$defs/ui"
+    }
+  },
+  "$defs": {
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "storage_root",
+        "history_limit"
+      ],
+      "properties": {
+        "storage_root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "知识库根目录（绝对路径）。修改只对新库生效。"
+        },
+        "history_limit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_items",
+            "max_bytes"
+          ],
+          "properties": {
+            "max_items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_bytes": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "watch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interval_secs",
+        "active_sync"
+      ],
+      "properties": {
+        "interval_secs": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 3600,
+          "default": 60
+        },
+        "active_sync": {
+          "type": "boolean"
+        }
+      }
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_hybrid",
+        "top_k",
+        "rrf_k"
+      ],
+      "properties": {
+        "default_hybrid": {
+          "$ref": "#/$defs/hybrid"
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 10
+        },
+        "rrf_k": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 200,
+          "default": 60
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "top_k_options",
+        "preview_chars"
+      ],
+      "properties": {
+        "top_k_options": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "preview_chars": {
+          "type": "integer",
+          "minimum": 80,
+          "maximum": 2000,
+          "default": 240
+        }
+      }
+    },
+    "llm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "base_url",
+        "model",
+        "timeout_ms",
+        "max_tokens",
+        "has_key",
+        "enabled"
+      ],
+      "properties": {
+        "provider": {
+          "enum": [
+            "openai_compat",
+            "ollama",
+            "llama_cpp",
+            "custom"
+          ]
+        },
+        "base_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "has_key": {
+          "type": "boolean",
+          "description": "只读：是否已配置密钥。密钥本身不入 JSON。"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_tabs",
+        "locale",
+        "theme"
+      ],
+      "properties": {
+        "max_tabs": {
+          "const": 5
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 2
+        },
+        "theme": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hybrid": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bm25_only"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vector_only"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "weights",
+            "rrf_k"
+          ],
+          "properties": {
+            "kind": {
+              "const": "hybrid"
+            },
+            "weights": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bm25",
+                "vector"
+              ],
+              "properties": {
+                "bm25": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "vector": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            },
+            "rrf_k": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 200
+            }
+          }
+        }
+      ]
+    }
+  }
+}

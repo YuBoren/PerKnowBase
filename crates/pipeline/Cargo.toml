@@ -1,0 +1,16 @@
+# perknow-pipeline — L2（owner：C）
+# 允许依赖：`perknow-contracts`、`perknow-core`、`perknow-storage`（仅端口）
+# 禁止依赖：`tauri`、`qdrant-client`、`tantivy`、任一 L3；不得调用 `perknow-index`（BAN-13）
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-pipeline"
+description = "`DocumentParser`（native + sidecar 客户端）、`Chunker`（纯函数）、`Embedder`（ONNX）、解析缓存读写。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+perknow-contracts = { workspace = true }
+perknow-core = { workspace = true }

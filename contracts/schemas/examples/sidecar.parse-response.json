@@ -1,0 +1,55 @@
+{
+  "jsonrpc": "2.0",
+  "id": "0199a1f0-bbbb-7c3a-9d2e-000000000003",
+  "result": {
+    "file_id": "0199a1f0-cccc-7c3a-9d2e-000000000004",
+    "rel_path": "optics/a.md",
+    "kind": "markdown",
+    "parser": {
+      "name": "native",
+      "version": "1",
+      "mode": "raw"
+    },
+    "blocks": [
+      {
+        "block_id": "b0",
+        "order": 0,
+        "block_type": "TITLE",
+        "text": "光学基础",
+        "source_location": {
+          "kind": "text",
+          "line_start": 1,
+          "line_end": 1,
+          "col_start": 0,
+          "col_end": 0
+        },
+        "level": 1,
+        "table": null,
+        "image": null,
+        "metadata": null
+      },
+      {
+        "block_id": "b1",
+        "order": 1,
+        "block_type": "TEXT",
+        "text": "硅的折射率约为 3.5。",
+        "source_location": {
+          "kind": "text",
+          "line_start": 3,
+          "line_end": 3,
+          "col_start": 0,
+          "col_end": 0
+        },
+        "level": null,
+        "table": null,
+        "image": null,
+        "metadata": null
+      }
+    ],
+    "warnings": [],
+    "page_count": null,
+    "cache_path": null,
+    "parsed_at": "2026-10-26T05:44:03.123Z",
+    "elapsed_ms": 12
+  }
+}

@@ -1,0 +1,3 @@
+# 单前端包：apps/ui（D 主）。根 package.json 只放跨包脚本。
+packages:
+  - "apps/ui"

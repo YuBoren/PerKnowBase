@@ -1,0 +1,61 @@
+# PerKnowBase — Rust workspace（L0–L4 全部 Rust 代码）
+#
+# 规划见 docs/project-structure.md §2/§3；分层与依赖方向见
+# contracts/architecture-boundaries.md §1/§2（CI 用 scripts/check-deps.ps1 强制）。
+# 版本策略：所有 workspace crate 共用 [workspace.package] 版本；外部依赖版本只在此处锁定。
+
+[workspace]
+resolver = "2"
+members = [
+  "crates/contracts",
+  "crates/core",
+  "crates/storage",
+  "crates/pipeline",
+  "crates/index",
+  "crates/llm",
+  "crates/kb",
+  "crates/settings",
+  "crates/fs",
+  "crates/sync",
+  "crates/search",
+  "crates/history",
+  "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.82"
+repository = "https://github.com/YuBoren/PerKnowBase"
+
+[workspace.dependencies]
+# --- L0/L1 基础 ---
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.10", features = ["v7", "serde"] }
+thiserror = "2.0"
+sha2 = "0.10"
+tokio = { version = "1.40", features = ["sync", "time", "macros", "rt"] }
+async-trait = "0.1"
+tracing = "0.1"
+ts-rs = { version = "10.1", features = ["serde-json-impl"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# --- 应用外壳（只有 apps/desktop 可用，BAN-05）---
+tauri = { version = "2", features = [] }
+tauri-build = { version = "2" }
+
+# --- workspace 内部 crate（依赖方向由 check-deps 校验）---
+perknow-contracts = { path = "crates/contracts" }
+perknow-core = { path = "crates/core" }
+perknow-storage = { path = "crates/storage" }
+perknow-pipeline = { path = "crates/pipeline" }
+perknow-index = { path = "crates/index" }
+perknow-llm = { path = "crates/llm" }
+perknow-kb = { path = "crates/kb" }
+perknow-settings = { path = "crates/settings" }
+perknow-fs = { path = "crates/fs" }
+perknow-sync = { path = "crates/sync" }
+perknow-search = { path = "crates/search" }
+perknow-history = { path = "crates/history" }

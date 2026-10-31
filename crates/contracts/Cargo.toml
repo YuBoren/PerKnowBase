@@ -1,0 +1,23 @@
+# perknow-contracts — L0（owner：A（主笔））
+# 允许依赖：（无 workspace 内部依赖）
+# 禁止依赖：任何 workspace crate（防循环）；`tauri`、`rusqlite`、`qdrant-client`、`tantivy`、`ort` 等引擎库
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-contracts"
+description = "领域类型、枚举、错误码、事件名、版本常量（`CONTRACT_VERSION` / `SCHEMA_VERSION` / `PARSER_PROTOCOL_VERSION`）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+ts-rs = { workspace = true, optional = true }
+
+[features]
+default = []
+# 生成 TS 类型：cargo test -p perknow-contracts --features ts（产物目录由 D 的 gen-types 脚本注入）
+ts = ["dep:ts-rs"]

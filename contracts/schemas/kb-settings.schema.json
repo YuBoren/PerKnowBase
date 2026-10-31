@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perknowbase.local/schemas/kb-settings.schema.json",
+  "title": "kb-settings",
+  "description": "库级设置（kb.sqlite3.settings.json 单行 JSON）。字段定义见 contracts/data-model.md §2.14，Rust 类型见 crates/contracts/src/settings.rs（KbSettings）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chunk",
+    "embedding",
+    "parse",
+    "search",
+    "created_from"
+  ],
+  "properties": {
+    "chunk": {
+      "$ref": "#/$defs/chunk"
+    },
+    "embedding": {
+      "$ref": "#/$defs/embedding"
+    },
+    "parse": {
+      "$ref": "#/$defs/parse"
+    },
+    "search": {
+      "$ref": "#/$defs/search"
+    },
+    "created_from": {
+      "$ref": "#/$defs/created_from"
+    }
+  },
+  "$defs": {
+    "chunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "max_chars",
+        "overlap_chars",
+        "code_aware"
+      ],
+      "properties": {
+        "strategy": {
+          "enum": [
+            "recursive",
+            "semantic",
+            "parent_child",
+            "ast"
+          ]
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "overlap_chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "code_aware": {
+          "type": "boolean"
+        }
+      }
+    },
+    "embedding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "dim",
+        "batch_size",
+        "image_enabled"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dim": {
+          "enum": [
+            128,
+            256,
+            512,
+            768
+          ]
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image_enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "parse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mineru_mode",
+        "cache_enabled",
+        "keep_cache_on_export"
+      ],
+      "properties": {
+        "mineru_mode": {
+          "enum": [
+            "flash",
+            "basic",
+            "standard",
+            "advanced"
+          ]
+        },
+        "cache_enabled": {
+          "type": "boolean"
+        },
+        "keep_cache_on_export": {
+          "type": "boolean"
+        }
+      }
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overrides"
+      ],
+      "properties": {
+        "overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default_hybrid": {
+              "$ref": "#/$defs/hybrid"
+            },
+            "rrf_k": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 200
+            }
+          }
+        }
+      }
+    },
+    "created_from": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app_version",
+        "contract_version"
+      ],
+      "properties": {
+        "app_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "hybrid": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bm25_only"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vector_only"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "weights",
+            "rrf_k"
+          ],
+          "properties": {
+            "kind": {
+              "const": "hybrid"
+            },
+            "weights": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bm25",
+                "vector"
+              ],
+              "properties": {
+                "bm25": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "vector": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            },
+            "rrf_k": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 200
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+# perknow-history — L3（owner：B）
+# 允许依赖：`contracts`、`core`、`storage`
+# 禁止依赖：`tauri`、`index`、`llm`、`search`、`kb`
+# 依赖方向由 scripts/check-deps.ps1 强制（contracts/architecture-boundaries.md §2）。
+[package]
+name = "perknow-history"
+description = "`HistoryService`：历史写入/查询/删除/裁剪、软引用轻量快照。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+perknow-contracts = { workspace = true }
+perknow-core = { workspace = true }

@@ -1,0 +1,6 @@
+# 固定工具链：保证 fmt/clippy 输出跨机器一致（docs/project-structure.md §7）。
+# 升级流程：改本文件 + 跑一遍 AGENTS.md §8 全部命令 + 一个 [chore] PR。
+[toolchain]
+channel = "stable"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
