@@ -17,3 +17,4 @@
 - **澄清** `data-model.md` §4.2 `merge_journal.status`：明确为**条目级**状态（`planned`/`done`/`rolled_back`），整体状态在 `merge_op.status`（PATCH，无行为变化）。
 - **裁决** `BlockType` 取值：按 §2.4 字面用大写；`README.md` §4 补“代码型枚举报大写”例外（DEC-20261031-26，待 C 确认）。
 - **代码** `crates/contracts` 落地对应类型与 `CONTRACT_VERSION`/`SCHEMA_VERSION`/`PARSER_PROTOCOL_VERSION`（PA-05）；`crates/core` 落地 `EventSink`/`CancelToken`/路径与哈希工具（PA-06）。
+- **代码澄清** `AppError` 派生 `PartialEq`（`llm_probe`、`kb://op-done` 等含 `Option<AppError>` 的结构需要比较）；仅 Rust 侧派生，**线上 JSON 不变**。

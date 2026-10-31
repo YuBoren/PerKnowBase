@@ -70,6 +70,7 @@
 
 | 编号 | 标题 | 状态 | 影响 | 契约版本 |
 |---|---|---|---|---|
+| DEC-20261031-27 | CI 跳过机制改为 step 级检测（job 级 if 不支持 `hashFiles`） | Accepted | A、D、全员 | — |
 | DEC-20261031-26 | `BlockType` 取值大小写：以字面为准（代码型枚举报大写） | Proposed | C、A、B | 0.1.0 |
 | DEC-20261031-25 | Qdrant 进程契约补全（PX-01） | Proposed | B、A、C | 0.1.0 |
 | DEC-20261031-24 | `migrations` 范围澄清与文档补齐 | Accepted | 全员 | — |
@@ -101,6 +102,23 @@
 
 ## 4. 决策详情（最新在上）
 
+### DEC-20261031-27 CI 跳过机制改为 step 级检测（job 级 if 不支持 `hashFiles`）
+
+- 日期：2026-10-31　决策者：A　状态：Accepted　契约版本：—
+- 影响：A（CI 编排）、D（ui / gen-diff 作业）、全员（required checks 语义）　通知：@A @B @C @D　确认：A 自查（本地 YAML 解析 + 五个校验脚本全绿）　关联：`.github/workflows/ci.yml`、`scripts/README.md`、DEC-20261030-23（共享模块）
+
+**决策**：① 删除 `jobs.<job>.if` 里的 `hashFiles(...)`：GitHub 在**排队阶段**求值 job 级 `if`，此时还没有工作区，会以 “Unrecognized function: 'hashFiles'” **拒绝整个 workflow**（推送后直接 Run failed）；② 三个条件作业（`ui` / `gen-diff` / `integration-smoke`）改为“第一步检测文件是否存在 → 写 `steps.detect.outputs.exists` → 其余 step 用 `if: steps.detect.outputs.exists == 'true'`”，并打 `::notice::` 说明跳过原因；③ 语义不变：对象不存在时不阻断，存在时全量执行；④ 增加 `workflow_dispatch` 便于手动重跑；⑤ 顺手修正 Ubuntu 24.04 上已移除的 `libappindicator3-dev`（改用 `libayatana-appindicator3-dev`，22.04/24.04 都有）。
+
+**理由**：job 级 `if` 无法做“文件存在性”判断（没有 checkout），`hashFiles` 只在 step 级可用；用 job 级 if 只能“永远红”或“永远跳过”。
+
+**影响**：
+- [x] `.github/workflows/ci.yml`：三个作业改写为“检测 + 门控”，补充 Linux 依赖包名与手动触发
+- [x] 本地验证：YAML 可解析、无 `hashFiles` 残留、五个校验脚本全绿
+- [ ] D：PD-02 / PD-03 落地后对应作业自动开始执行；届时只需删掉 `::notice::` 里的“尚未建立”措辞，不需要改结构
+
+**回滚**：恢复 job 级 `if` + `hashFiles` 会让 workflow 再次无效，禁止；若要改变跳过策略（例如“不存在即红”），另写 DEC。
+
+---
 ### DEC-20261031-26 `BlockType` 取值大小写：以 §2.4 字面为准（代码型枚举报大写）
 
 - 日期：2026-10-31　决策者：A　状态：Proposed　契约版本：0.1.0（预冻结补齐）

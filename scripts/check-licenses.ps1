@@ -64,10 +64,21 @@ if (Test-Path -LiteralPath $rootManifest) {
     foreach ($n in Get-DeclaredDependencies $rootManifest) { $declared.Add($n) }
 }
 
-foreach ($manifest in Get-ChildItem -LiteralPath $RepoRoot -Recurse -Filter 'Cargo.toml' -File) {
-    if ($manifest.FullName -eq $rootManifest) { continue }
-    if ($manifest.FullName -match 'node_modules') { continue }
-    foreach ($n in Get-DeclaredDependencies $manifest.FullName) { $declared.Add($n) }
+# 只查 workspace members（直读根 Cargo.toml），避免递归扫描 target/ 之类的构建产物目录
+$rootText = Get-Content -LiteralPath $rootManifest -Raw -Encoding UTF8
+$membersBlock = [regex]::Match($rootText, '(?s)members\s*=\s*\[(.*?)\]')
+if (-not $membersBlock.Success) {
+    Write-Host '[FAIL] 根 Cargo.toml 找不到 [workspace] members'
+    exit 1
+}
+$members = @([regex]::Matches($membersBlock.Groups[1].Value, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+foreach ($member in $members) {
+    $manifestPath = Join-Path $RepoRoot ($member + '/Cargo.toml')
+    if (-not (Test-Path -LiteralPath $manifestPath)) {
+        Write-Host "[FAIL] members 里的 $member 找不到 Cargo.toml"
+        exit 1
+    }
+    foreach ($n in Get-DeclaredDependencies $manifestPath) { $declared.Add($n) }
 }
 
 foreach ($pkg in @((Join-Path $RepoRoot 'package.json'), (Join-Path $RepoRoot 'apps/ui/package.json'))) {

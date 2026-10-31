@@ -18,9 +18,9 @@ src-tauri/
 ├─ icons/                   # 占位图标（Phase-0 生成，发布前替换为正式素材）
 └─ src/
    ├─ main.rs               # 进程入口（windows_subsystem 属性）
-   ├─ lib.rs                # Builder、manage(AppState)、注册 handler、run
+   ├─ lib.rs                # Builder、manage(AppState)、invoke_handler 注册、run
    ├─ commands/
-   │  ├─ mod.rs             # 命令注册表（A 独占）：handler() 是唯一生成处
+   │  ├─ mod.rs             # 命令模块入口（A 独占）：注册说明与模块声明
    │  ├─ table.rs           # 39 条命令的清单（name/owner/status），供校验脚本比对
    │  └─ app_info.rs        # Phase-0 唯一实现：返回版本与契约版本
    ├─ dto/mod.rs            # 入参 DTO（Phase-1 从 perknow-contracts 引入，deny_unknown_fields）
@@ -33,7 +33,7 @@ src-tauri/
 
 1. 先改 `contracts/interface-contracts.md` §4 + `crates/contracts`（MINOR/MAJOR 按 `contracts/README.md` §2）；
 2. 在 `commands/table.rs` 增一行 `CommandSpec`（`status: Pending`）；
-3. 实现 `commands/<域>.rs`，在 `commands/mod.rs` 的 `handler()` 里注册，状态改 `Implemented`；
+3. 实现 `commands/<域>.rs`，在 `lib.rs` 的 `.invoke_handler(tauri::generate_handler![...])` 里加一行，状态改 `Implemented`；
 4. 跑 `pwsh scripts/validate-contracts.ps1`（会比对文档表与 `table.rs`）；
 5. 由 D 跑 `scripts/gen-types` 重新生成 `apps/ui/src/lib/tauri-api`（生成物禁止手改，BAN-08）。
 

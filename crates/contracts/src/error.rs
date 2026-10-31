@@ -201,7 +201,10 @@ impl ErrorCode {
 }
 
 /// 统一错误载荷：命令返回 `Result<T, AppError>`，事件 `error://toast` 复用同一结构。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// 派生 `PartialEq` 是必要的：多个事件/结果结构（`kb://op-done`、`llm_probe`）包含
+/// `Option<AppError>` 并派生 `PartialEq`，否则这些结构无法比较（E0369）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
 pub struct AppError {

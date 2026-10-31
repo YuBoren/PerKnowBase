@@ -10,7 +10,7 @@
 |---|---|
 | 阶段 | Phase-0：契约冻结 + 工程骨架（不写业务实现） |
 | 契约版本 | `0.1.0`（预冻结补齐已完成；**等待 B/C/D 签字**） |
-| 分支 | `ybr`（A 的骨架改动**已完成、待提交**：本机沙箱对 `.git` 只读） |
+| 分支 | `ybr`（骨架轮次 `8f80408` 已推送；本轮 CI 修复与编译修补**待提交**：本机沙箱对 `.git` 只读） |
 | 下一里程碑 | 契约签字（PX-02）→ B/C/D 各自骨架并行 |
 | 更新日期 | 2026-10-31 |
 
@@ -88,12 +88,13 @@
 3. **C**：PC-02（sidecar 协议 echo + 黄金报文）/ PC-03（fixtures）；顺带确认 `BlockType` 大写。
 4. **D**：PD-02（React 壳）→ PD-03（生成链）；落地后 `version.ts` 版本比对、前端 `invoke`/`fetch` 扫描、`gen-diff` 作业自动生效。
 5. **A**：Phase-1 起步补 `crates/storage` 的 `MetadataRepo` 端口与迁移 runner、`crates/kb`/`crates/settings` 服务骨架；命令按 `commands/table.rs` 的 `Pending` 列表逐个接上。
-6. **CI 首跑**：在有网络的环境跑一次 `cargo build`/`clippy`/`test` 与 `pnpm` 作业，修正 manifest 层面的问题。
+6. **CI 重跑**：workflow 语法已修（DEC-20261031-27），推送后重跑一次；确认 `rust`、`contracts`、`guards` 三作业首绿，再按日志修剩余问题。
 
 ## 5. 阻塞与待决
 
-- **提交待办**：本机沙箱禁止写 `.git`，改动留在工作区未提交；commit 文案已备好（`.git/dsh_commit_msg.txt`），在有写权限的环境执行 `git add -A && git commit -F .git/dsh_commit_msg.txt` 即可（完成后删除该临时文件）。
-- **本机验证缺口**：评审环境无 crates 缓存与 `pnpm`，`cargo build`/`clippy`/`cargo test`/`pnpm build` 未跑过；已用 `rustfmt --check`、`cargo metadata`、五个校验脚本、空库迁移执行做替代验证。**CI 首跑是唯一闸门**。
+- **提交待办**：本机沙箱禁止写 `.git`，本轮改动（CI 语法修复 + `AppError` 派生 `PartialEq` + 文档同步）留在工作区；在有写权限的环境执行 `git add -A && git commit && git push`（commit 建议 trailer：`Agent-Task: PA-05,PA-10,PX-02`、`Agent-Decision: DEC-20261031-27`）。
+- **CI 首跑未完成**：首推因 workflow 语法被 GitHub 拒绝（job 级 `if` 不支持 `hashFiles`），已修并记 DEC-20261031-27；修复后需重跑一次，确认 `rust`（fmt/clippy/test）与 `contracts`/`guards` 作业首绿。
+- **本机验证缺口**：沙箱内 `cargo` 无法 spawn `rustc`、无 `pnpm`，因此 `cargo build/clippy/test` 与 `pnpm build` 仍未跑过。已用直调 `rustc`/`clippy-driver`（`crates/contracts`、`crates/core`、`apps/desktop/src-tauri` 全部通过，`-W clippy::all -D warnings` 无告警）、`rustfmt --check`、五个校验脚本与空库迁移执行做替代验证。**CI 是最终闸门**。
 - `apps/ui` 未建立：前端 `invoke`/`fetch` 扫描与 `version.ts` 版本比对暂为 `[skip]`（随 PD-02 自动生效）。
 - 待 B/C/D 确认：DEC-20261031-25、DEC-20261031-26（Proposed）。
 - 待用户确认：`LICENSES/THIRD-PARTY.md` §3 的 Phase-1 依赖（qdrant-client / tantivy / ort / notify / reqwest / zip / keyring 等）选型与许可；MinerU（AGPL）以独立进程使用的边界。

@@ -35,7 +35,9 @@
 | 禁令扫描 | `pwsh scripts/check-boundaries.ps1` | ok（44 个 Rust 文件） |
 | 迁移空库执行 | `pwsh scripts/check-migrations.ps1` | ok（app 3 表/1 索引；kb 12 表/17 索引；`SCHEMA_VERSION=1`） |
 | 许可登记 | `pwsh scripts/check-licenses.ps1` | ok（12 个已声明依赖） |
-| Rust 语法与格式 | `rustfmt --check`（逐文件） | ok；`cargo build` 因本机无 crates 缓存/网络未验证（CI 负责） |
+| Rust 类型检查 | 直接调用 `rustc --emit=metadata` 编译 `crates/contracts` / `crates/core` / `apps/desktop/src-tauri`（本机沙箱内 `cargo` 无法 spawn `rustc`，用预构建依赖绕过） | ok（三 crate 均无错误） |
+| Rust lint | `clippy-driver -W clippy::all -D warnings`（同上方式） | ok（无告警） |
+| Rust 格式 | `rustfmt --check`（逐文件） | ok；CI 仍以 `cargo fmt --all --check` / `cargo clippy --workspace` 为准 |
 
 ## 4. 各 owner 审核清单
 

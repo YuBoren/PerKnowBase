@@ -1,10 +1,14 @@
 # CI 闸门（contracts/architecture-boundaries.md §8.1；顺序见 AGENTS.md §8）
 #
-# 全部为 required checks。Phase-0 阶段有些作业会因为对象尚未建立而自动跳过：
+# 全部为 required checks。Phase-0 阶段有些作业会因为对象尚未建立而暂时空转：
 #   - ui：apps/ui/package.json 尚未创建（D 的 PD-02）
 #   - gen-diff：scripts/gen-types.ps1 尚未创建（D 的 PD-03）
 #   - integration-smoke：tests/integration 还没有用例（D 牵头）
-# 跳过是显式的（if 条件），不是永久豁免；对象建立后自动开始执行。
+#
+# 注意：GitHub Actions 的 `hashFiles()` 只能出现在 **step 级 if**，不能用于
+# **job 级 if**（job 级 if 在排队前求值，尚无工作区，会报 "Unrecognized function: hashFiles"）。
+# 因此这里统一用“第一步检测 + steps.<id>.outputs 门控”的方式跳过，而不是 job 级 if。
+# 跳过是显式的（::notice:: 会写在日志里），不是永久豁免；对象建立后自动开始执行。
 
 name: ci
 
@@ -12,6 +16,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -35,7 +40,9 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          # Ubuntu 24.04 没有 libappindicator3-dev，统一用 ayatana 包名（22.04/24.04 都有）
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libxdo-dev libssl-dev build-essential
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -79,43 +86,93 @@ jobs:
 
   ui:
     name: ui (tsc / lint / unit)
-    if: ${{ hashFiles('apps/ui/package.json') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Detect apps/ui
+        id: detect
+        shell: bash
+        run: |
+          if [ -f apps/ui/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=skip::apps/ui 尚未建立（D 的 PD-02），ui 作业空转"
+          fi
       - uses: pnpm/action-setup@v4
+        if: steps.detect.outputs.exists == 'true'
       - uses: actions/setup-node@v4
+        if: steps.detect.outputs.exists == 'true'
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --dir apps/ui typecheck
-      - run: pnpm --dir apps/ui lint
-      - run: pnpm --dir apps/ui test
+      - name: install
+        if: steps.detect.outputs.exists == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: typecheck
+        if: steps.detect.outputs.exists == 'true'
+        run: pnpm --dir apps/ui typecheck
+      - name: lint
+        if: steps.detect.outputs.exists == 'true'
+        run: pnpm --dir apps/ui lint
+      - name: unit tests
+        if: steps.detect.outputs.exists == 'true'
+        run: pnpm --dir apps/ui test
 
   gen-diff:
     name: generated client is up to date
-    if: ${{ hashFiles('scripts/gen-types.ps1') != '' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Detect gen-types script
+        id: detect
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath 'scripts/gen-types.ps1') {
+            "exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+          else {
+            "exists=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            Write-Host "::notice title=skip::scripts/gen-types.ps1 尚未创建（D 的 PD-03），gen-diff 作业空转"
+          }
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.detect.outputs.exists == 'true'
       - uses: pnpm/action-setup@v4
+        if: steps.detect.outputs.exists == 'true'
       - uses: actions/setup-node@v4
+        if: steps.detect.outputs.exists == 'true'
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - name: install
+        if: steps.detect.outputs.exists == 'true'
+        run: pnpm install --frozen-lockfile
       - name: regenerate
+        if: steps.detect.outputs.exists == 'true'
         run: pwsh -NoProfile -File scripts/gen-types.ps1
       - name: diff must be empty
+        if: steps.detect.outputs.exists == 'true'
         run: git diff --exit-code apps/ui/src/lib/tauri-api
 
   integration-smoke:
     name: integration smoke
-    if: ${{ hashFiles('tests/integration/**/*.rs') != '' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Detect integration tests
+        id: detect
+        shell: pwsh
+        run: |
+          $found = @(Get-ChildItem -LiteralPath 'tests/integration' -Recurse -Filter '*.rs' -File -ErrorAction SilentlyContinue)
+          if ($found.Count -gt 0) {
+            "exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+          else {
+            "exists=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            Write-Host "::notice title=skip::tests/integration 还没有用例（D 牵头），集成冒烟作业空转"
+          }
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --workspace --test '*' -- --nocapture
+        if: steps.detect.outputs.exists == 'true'
+      - name: cargo test (integration)
+        if: steps.detect.outputs.exists == 'true'
+        run: cargo test --workspace -- --nocapture

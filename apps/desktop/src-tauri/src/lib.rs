@@ -29,7 +29,9 @@ pub fn run() {
             app.manage(sink);
             Ok(())
         })
-        .invoke_handler(commands::handler())
+        // 命令注册的唯一位置：新增命令必须先改 contracts/interface-contracts.md §4
+        // 与 commands/table.rs，再在这里加一行。
+        .invoke_handler(tauri::generate_handler![commands::app_info::app_info])
         .run(tauri::generate_context!())
         .expect("failed to run the PerKnowBase desktop shell");
 }
