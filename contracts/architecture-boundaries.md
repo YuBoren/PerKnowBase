@@ -109,13 +109,15 @@ apps/ui ──(generated TS only)──> apps/desktop/src-tauri ──> L3 servi
 | `contracts/**`（含 `CHANGELOG.md`、`schemas/`） | 接口/数据/边界契约 | A | 全员（按段落） |
 | `crates/contracts/**` | Rust 领域类型单一事实源 | A | B/C/D（各自字段） |
 | `crates/core/**` | ID/时间/哈希/路径/`EventSink`/`AppError` | A | 全员 |
-| `crates/storage/migrations/**` | 全库迁移脚本 | A | B/C 提需求 |
+| `crates/storage/migrations/**` | SQLite 表结构升级脚本（DDL） | A | B/C 只提表需求，禁止直接改脚本 |
 | `apps/ui/src/lib/tauri-api/**` | 生成的 IPC client（禁止手改） | D | A（生成器） |
 | `apps/ui/src/components/**` | 前端共享组件 | D | A/C（复用方） |
 | `tests/integration/**`、`tests/fixtures/**` | 集成测试与样例数据 | D | 全员 |
 | `scripts/**`、`.github/workflows/**` | 生成/校验/CI | A | D |
 | 根 `Cargo.toml`、`rust-toolchain.toml`、`package.json`、`pnpm-workspace.yaml` | 工作区与工具链 | A | 全员 |
 | `AGENTS.md`、`decisions.md`、`contracts/README.md` | 协作规则本身 | A | 全员 |
+
+> **关于 `migrations` 的澄清**：它被列为共享模块，是因为表结构同时影响 A/C 的写入与 B 的检索，任何变更都可能波及三方；但**写脚本的只有 A**（`crates/storage` 是唯一 SQL 出口），B/C 只提交“需要哪张表/哪一列”的需求。它只做 SQLite 结构升级，不搬运业务数据，也不管理 Qdrant —— 详见 `docs/project-structure.md` §2.1。
 
 ### 4.2 变更流程（固定 6 步）
 

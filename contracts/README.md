@@ -5,14 +5,16 @@
 
 ## 1. 文件与 owner
 
-| 文件 | 内容 | owner |
-|---|---|---|
-| `README.md` | 版本、变更流程、命名约定 | A |
-| `interface-contracts.md` | Rust trait、Tauri 命令/事件、sidecar 协议、错误码 | A（sidecar 段 C，检索段 B） |
-| `data-model.md` | 磁盘布局、对象字段、枚举/状态、SQLite 表、Qdrant/Tantivy、导出包 | A（存储）、B（索引）、C（解析缓存） |
-| `architecture-boundaries.md` | 分层、依赖矩阵、禁令、共享模块规则 | A 主持，全员评审 |
-| `CHANGELOG.md` | `contract_version` 记录 | A |
-| `schemas/`（待建） | JSON Schema：settings、manifest、events、sidecar | 各字段 owner |
+> 契约由 **A 主笔初稿**，B/C/D 按模块审核各自段落；任何修改仍走 PR（见 AGENTS §4.3）。
+
+| 文件 | 内容 | 撰写 | 审核 |
+|---|---|---|---|
+| `README.md` | 版本、变更流程、命名约定 | A | 全员 |
+| `interface-contracts.md` | Rust trait、Tauri 命令/事件、sidecar 协议、错误码 | A | C（sidecar 段）、B（检索/索引段）、D（命令/事件前端可用性） |
+| `data-model.md` | 磁盘布局、对象字段、枚举/状态、SQLite 表、Qdrant/Tantivy、导出包 | A | B（索引/检索段）、C（解析/对象段）、D（前端可见字段） |
+| `architecture-boundaries.md` | 分层、依赖矩阵、禁令、共享模块规则 | A | 全员 |
+| `CHANGELOG.md` | `contract_version` 记录 | A | 随契约 PR 评审 |
+| `schemas/`（待建） | JSON Schema：settings、manifest、events、sidecar | A | B/C/D 按字段 |
 
 ## 2. 版本化
 

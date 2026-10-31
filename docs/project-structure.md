@@ -3,6 +3,7 @@
 > 状态：**规划稿，不含实现代码**。第 0 周只建目录、空 crate 与文档指针；实现按第 1 周起的进度表推进。
 > 依据：`立项报告草稿.md` 四层架构 + `contracts/architecture-boundaries.md` 依赖矩阵 + `任务分工建议.md` 所有权。
 > 目标：四个人在各自分支上，**不读对方代码也能确定自己的文件该放哪**。
+> **维护**：新增根目录文件、计划外目录或模块，必须在同一 PR 更新本文件（目录树 + 归属 + 建仓顺序），见 `AGENTS.md` §4.3。
 
 ---
 
@@ -11,6 +12,7 @@
 ```
 PerKnowBase/
 ├─ AGENTS.md                     # 智能体入口（只指路，不写规则正文）
+├─ STATUS.md                     # 进度与交接（当前状态/下一步/阻塞）
 ├─ 立项报告草稿.md                # 需求/验收 SSOT
 ├─ 任务分工建议.md                # 所有权与节奏
 ├─ decisions.md                  # 异步决策日志（跨分支/跨 Agent 上下文）
@@ -35,7 +37,7 @@ PerKnowBase/
 │  ├─ integration/               # 跨模块集成（D 牵头）
 │  └─ e2e/                       # 端到端与跨平台冒烟
 ├─ scripts/                      # 生成/校验脚本（A + D）
-├─ LICENSES/                     # 第三方许可清单（A）
+├─ LICENSES/                     # 第三方许可清单（A，Phase-0 建；至少含 THIRD-PARTY.md）
 ├─ Cargo.toml                    # workspace
 ├─ rust-toolchain.toml
 ├─ package.json / pnpm-workspace.yaml
@@ -77,13 +79,34 @@ crates/<name>/
    └─ tests/              # 模块内单测（tests/ 或 #[cfg(test)]）
 ```
 
-`crates/storage/migrations/` 放 `0001_init.sql` 起的只追加脚本与 `app/`、`kb/` 两套（或按库名分目录）：
+### 2.1 `migrations` 是什么（SQLite 表结构升级脚本）
+
+**定义**：`crates/storage/migrations/` 存的是 **SQLite 的 DDL 脚本**，用来“建表/加列/加索引/重建表”，让**已有数据库**跟上新版本代码。它**不是**数据迁移（搬文件、搬知识库），**不涉及 Qdrant**（Qdrant 的结构变更是重建 collection，见 `contracts/data-model.md` §3.1）。
+
+**两个库、两条脚本链**：
 
 ```
 crates/storage/migrations/
-├─ app/0001_init.sql
-└─ kb/0001_init.sql, 0002_*.sql
+├─ app/0001_init.sql      # 应用库 app.sqlite3（全局一份：注册表、应用设置）
+│  └─ 0002_*.sql ...
+└─ kb/0001_init.sql       # 每个知识库的 kb.sqlite3（各一份：元数据、块、历史…）
+   └─ 0002_*.sql ...
 ```
+
+**什么时候执行**：
+
+- **新建知识库**：新建空 `kb.sqlite3`，从 `kb/0001` 顺序执行到最新，得到当前结构的库（相当于“从零建库”，复用同一批脚本）。
+- **打开旧知识库**：读 `schema_migrations` 表里已执行的最高版本，只执行比它新的脚本。
+- **导入旧导出包**：解压后按包里的 `schema_version` 补齐缺失脚本，再打开；包版本高于应用则拒绝（`KB_SCHEMA_TOO_NEW`）。
+- **应用启动**：对 `app.sqlite3` 做同样的“只跑未执行脚本”。
+
+**账本**：`schema_migrations(version, applied_at, checksum)` 记录每个脚本是否执行、执行时间、脚本哈希；`schema_version` 是“已执行的最高版本”（同时写入 `kb_meta` 与导出包 manifest）。checksum 不一致说明历史脚本被改过，拒绝打开（`KB_CORRUPTED`）。
+
+**典型需要迁移的场景**：新增列（如 `chunk.token_count`）、新增表（如 `merge_op`）、新增索引、SQLite 不支持直接修改时“建新表→拷数据→删旧表→改名”、导入旧版本包。
+
+**不需要迁移的场景**：用户创建/删除/融合知识库、修改设置、切换 LLM——这些是数据或文件操作，结构不变。
+
+**硬规则**：只追加、不改已合入脚本；空库必须能顺序跑通（`scripts/check-migrations`）；只有 A 写脚本，B/C 提表需求（PR）。**当前状态**：Phase-0 尚未创建这些脚本。
 
 ---
 
