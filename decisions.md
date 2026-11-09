@@ -122,7 +122,7 @@
 ### DEC-20261031-26 `BlockType` 取值大小写：以 §2.4 字面为准（代码型枚举报大写）
 
 - 日期：2026-10-31　决策者：A　状态：Proposed　契约版本：0.1.0（预冻结补齐）
-- 影响：C（sidecar 报文）、B（索引 payload 不涉块类型）、A（类型定义）　通知：@C @B @A @D　确认：A 已裁决，**待 C 确认**　关联：`data-model.md` §2.4、`contracts/README.md` §4、`crates/contracts/src/parse.rs`
+- 影响：C（sidecar 报文）、B（索引 payload 不涉块类型）、A（类型定义）　通知：@C @B @A @D　确认：A 已裁决，**待 C 确认** → **B 2026-11-09 同意**（索引侧只用 `ChunkType` 小写，不涉 `BlockType`，无影响）　关联：`data-model.md` §2.4、`contracts/README.md` §4、`crates/contracts/src/parse.rs`
 
 **决策**：`BlockType` 线上取值按 `data-model.md` §2.4 字面用**大写**：`TEXT|TITLE|TABLE|CODE|IMAGE|LIST`；`ParseWarning.code` 同样大写。判定标准：**代码型枚举**（错误码、警告码、块类型）用大写，**业务状态/类别枚举**（`KbStatus`、`FileKind`、`ChunkType`、`SearchMode` 等）用小写。`contracts/README.md` §4 已补这条例外。
 
@@ -139,7 +139,7 @@
 ### DEC-20261031-25 Qdrant 进程契约补全（PX-01）
 
 - 日期：2026-10-31　决策者：A（起草）　状态：Proposed　契约版本：0.1.0（预冻结补齐，无字段变更）
-- 影响：B（`crates/index` 实现）、A（打包与安装布局）、C（写入联调）　通知：@B @A @C @D　确认：A 已起草，**待 B 确认**　关联：DEC-20261026-06、`data-model.md` §3.1/§3.1.1、任务看板 PX-01
+- 影响：B（`crates/index` 实现）、A（打包与安装布局）、C（写入联调）　通知：@B @A @C @D　确认：A 已起草，**待 B 确认** → **B 2026-11-09 确认**（七条均在实现范围内，落地时在 PR 逐条勾选；遗留见 `docs/contract-review-0.1.0.md` §4.4）　关联：DEC-20261026-06、`data-model.md` §3.1/§3.1.1、任务看板 PX-01
 
 **决策**：把原先只有一行“单进程 + 随机端口”的 Qdrant 契约补成可实现的进程契约（新增 §3.1.1），明确七件事：
 ① 二进制位置 `<app_data>/qdrant/bin/qdrant`、每次启动覆盖写 `config.yaml`、只用 HTTP REST、必须绑回环地址；
