@@ -78,8 +78,8 @@
 | 2 | §3.7 `ScoredChunk` 不含预览 | 预览唯一来源 `chunk.content`，避免两套文本源，同意（须配套 F3 的批量端口，否则 P-01 不达）。 |
 | 3 | §3.8 模式表与默认值 | `hybrid{bm25:0.5, vector:0.5}, rrf_k=60`（10..=200）、`top_k=10`（1..=50）、Summary 降级路径（`degraded=true` + 拼接上下文 + 原样引用 + `warnings`），按此实现。 |
 | 4 | §3.1 Qdrant payload | 11 字段与索引标记合理；`content` 不入 payload、`source_location` 存 JSON 串、移动只改 `rel_path`，同意。 |
-| 5 | §3.1.1 Qdrant 进程契约（PX-01） | 七条（端口 6333→6333..6342→系统分配、`runtime.json` 唯一运行期来源、`lock` 单实例、`/readyz` 200ms×30s、`/healthz` 10s×3、退避 1/2/4s 上限 3 次、SIGTERM 不带 `/F` 等 10s、迁移 5 步）均在实现范围内，**B 确认 DEC-20261031-25**，落地时在 PR 逐条勾选。 |
-| 6 | §3.2 Tantivy schema | 8 字段 + `jieba`（缺依赖降级 ngram 且必须写 `warnings`）+ `k1=1.2, b=0.75` + 每批 `commit`/`reload`，同意；`qdrant-client`/`tantivy`/`tantivy-jieba` 的依赖登记（BAN-20 + `LICENSES/`）由 B 在 W1 前提 DEC。 |
+| 5 | §3.1.1 Qdrant 进程契约（PX-01） | 按 DEC-20261031-25 的七条逐项核对：①二进制位置与 `config.yaml` 覆盖写、只用 HTTP REST 且绑回环；②端口 6333→6333..6342→系统分配，`runtime.json` 为唯一运行期来源；③`lock` 排他 + `runtime.json` 探活，残留锁可接管；④`/readyz` 200ms×30s、`/healthz` 10s×3；⑤重启退避 1/2/4s、5 分钟窗口上限 3 次；⑥关闭 SIGTERM（Windows `taskkill` 不带 `/F`）等 10s、空闲 30 分钟回收；⑦数据目录迁移 5 步 + 版本升级两条路径。均在 `crates/index` 实现范围内，**B 确认 DEC-20261031-25**，落地时在 PR 逐条勾选。 |
+| 6 | §3.2 Tantivy schema | 8 字段 + `jieba`（缺依赖降级 ngram 且必须写 `warnings`）+ `k1=1.2, b=0.75` + 每批 `commit`/`reload`，同意。三项依赖在 `LICENSES/THIRD-PARTY.md` §3 已登记（状态「待确认」），仍需一条 DEC 覆盖引入并给出许可结论（BAN-20），B 在 W1 前补。 |
 | 7 | `index://status` 事件 | 载荷 `{kb_id, indexed, total, failed, state, last_error?}`、`state ∈ idle\|indexing\|stale`、不含端口，满足前端展示且符合 BAN-16，同意。 |
 
 #### 4.4.2 待补缺口（按截止时点排序）
@@ -87,19 +87,19 @@
 | # | 缺口 | 证据 | 影响 | 建议处置 | 时点 |
 |---|---|---|---|---|---|
 | F1 | **查询向量无生产方** | §3.8 只收 `query: String`；§3.7 `search_vector` 需 `VectorQuery.vector`；`architecture-boundaries.md` §2 禁止 `search` 依赖 `pipeline`，而 `Embedder`（§3.5）是 pipeline 端口 | 三模式第一步即断链，Minimal 也跑不通 | 契约补一句：`Embedder` 作为跨 crate 端口，trait 定义下沉到 `crates/contracts`，`SearchService` 持 `Arc<dyn Embedder>` 注入，装配在 `apps/desktop` | W1 前（MINOR） |
-| F2 | **`kb_meta.index_version` 无写端口** | 列见 `data-model.md` §4.2；owner 见 §4.4「`index_version` → B，重建/恢复/融合递增」；但 §3.3 `MetadataRepo` 只有 `kb_meta_get`，BAN-05 禁止 B 拼 SQL | `index_version` 恒为 0，`SearchResult.index_version` 与陈旧检测失效（D 的历史复现亦依赖） | A 在 `MetadataRepo` 增 `kb_meta_incr_index_version(kb_id) -> u64`（单事务 +1 并返回新值） | W1 前（MINOR） |
-| F3 | **预览补齐无批量端口** | §3.7 预览走 `MetadataRepo.chunk_get`；§3.3 仅单条 `chunk_get`；`top_k=10` + 两路候选各 50 → 最坏 100 次往返 | 直击 P-01（极简 p95 ≤ 500ms） | 增 `chunk_get_many(kb_id, ids) -> Vec<DocumentChunk>` | W2 前（MINOR） |
-| F4 | **历史列表返回类型自相矛盾** | §3.8 `HistoryService::list -> Vec<HistoryRecord>`，§2.16 又注册 `HistoryPage{items,total,has_more}`（owner B），§4.3（D）清单要求 `has_more` 分页 | 前端无处取分页信息；冻结后再改 trait 返回类型即 MAJOR | **冻结前**改为 `list(kb_id, f: HistoryFilter, offset: u32, limit: u32) -> Result<HistoryPage>`；同时 `trim(keep, max_bytes)` 与 `MetadataRepo::history_trim(keep)` 参数不一致，一并补齐 | **0.1.0 冻结前**（实现未写，成本为 0） |
-| F5 | **`update_path` 的 Tantivy 侧无实现路径** | §3.7 写「移动：只改 payload/字段」；§3.2 `rel_path` 为 STORED 字段；Tantivy 无 update API，只能 delete + add，重建文档需 `content`（BAN-07 限其来自 `chunk.content`） | 移动文件后 BM25 命中仍指向旧路径，跳转错文件 | 契约补一句：`update_path` 在 Tantivy 侧按 `delete(chunk_id)` + 由 `chunk_get` 重取 `content` 重建；失败标 `stale` | W2 前（MINOR） |
+| F2 | **`index_version` 的递增职责判给 B，但 B 无路径** | `data-model.md` §4.2 有该列、§4.4 判 owner=B「重建/恢复/融合递增」；而 §3.3 `MetadataRepo` 只暴露 `kb_meta_get`，BAN-03 禁止非 `storage` 的 crate 自建 SQLite 连接或拼 SQL | 责任与权限不匹配：`SearchResult.index_version` 与陈旧检测落不了地（D 的历史复现亦依赖） | 二选一：①A 在 `MetadataRepo` 增 `kb_meta_incr_index_version(kb_id) -> u64`（单事务 +1 返回新值），B 调用；②把 `data-model.md` §4.4 该行 owner 改为 A（由 `kb` 在重建/融合内递增），B 只读 | W1 前（MINOR） |
+| F3 | **预览补齐缺批量端口**（建议项，不阻塞） | §3.7 预览走 `MetadataRepo.chunk_get`；§3.3 仅单条 `chunk_get`；往返次数 = 返回命中数（默认 `top_k=10`，上限 50），候选 100 条只参与打分、不需要预览 | 单次检索 10～50 次点查，P-01 预算内可接受；但 P-04 五标签并发时按标签数线性放大 | 增 `chunk_get_many(kb_id, ids) -> Vec<DocumentChunk>`（单次 `IN` 查询） | W2 前（MINOR，可与 F1 合并一次补） |
+| F4 | **历史列表返回类型自相矛盾** | §4 命令表 `history_list` 入参已是 `{kb_id, filter, offset, limit}`、返回 `HistoryPage`；而 §3.8 `HistoryService::list` 仍返回 `Vec<HistoryRecord>`，`HistoryPage{items,total,has_more}` 在 §2.16 注册（owner B）却无生产方 | 命令层要分页、服务层给不出 `total`/`has_more`；冻结后再改 trait 返回类型即 MAJOR | **冻结前**改为 `list(kb_id, f: HistoryFilter, offset: u32, limit: u32) -> Result<HistoryPage>`；同时 `trim(keep, max_bytes)` 与 `MetadataRepo::history_trim(keep)` 参数不一致，一并补齐 | **0.1.0 冻结前**（实现未写，成本为 0） |
+| F5 | **`update_path` 缺 `content`，Tantivy 侧无法重建文档** | §3.7 签名 `update_path(kb_id, file_id, rel_path)`、注释「只改 payload/字段」；§3.2 `rel_path` 是 STORED 字段、Tantivy 无 update API（只能 delete + add，add 需 `content`）；而依赖矩阵禁止 `index` 依赖 `storage`，`crates/index` 自己取不到 `chunk.content`（BAN-07 又限定语料只能来自它） | 移动文件后 BM25 仍指向旧路径、跳转错文件；现有签名下没有合法实现路径 | 签名改为批量并带正文：`update_path(kb_id, items: &[PathUpdate{chunk_id, rel_path, content}])`，由调用方 `sync`（允许依赖 storage + index）从 `chunk_get` 取 `content` 传入；失败标 `stale` | **0.1.0 冻结前**（只改签名，实现未写，成本为 0） |
 
-> 签字附带条件：**F4** 由 A 在 `contract_version 0.1.0` 冻结前修订（仅改 trait 签名，无实现成本）；**F1/F2/F3/F5** 以 0.1.1 MINOR 补齐。B 在 W1 动 `crates/index` 时按现有契约先行，不以此为阻塞。
+> 签字附带条件：**F4、F5** 由 A 在 `contract_version 0.1.0` 冻结前修订（均为 trait 签名调整，实现未写，成本为 0）；**F1、F2、F3** 以 0.1.1 MINOR 补齐。B 在 W1 动 `crates/index` 时按现有契约先行，不以此为阻塞。
 
 ## 5. 签字
 
 | 角色 | 结论 | 日期 | 备注 |
 |---|---|---|---|
 | A | 同意冻结（待全体签字） | 2026-10-31 | 见 §3 自查 |
-| B | 有条件同意冻结（F1–F5 待补，F4 需冻结前改） | 2026-11-09 | 已确认 DEC-20261031-25；意见见 §4.4 |
+| B | 有条件同意冻结（F4/F5 需冻结前改，F1–F3 以 0.1.1 补） | 2026-11-09 | 已确认 DEC-20261031-25；意见见 §4.4 |
 | C | 待签 | — | 需先确认 DEC-20261031-26 |
 | D | 待签 | — | 需确认命令/事件可用性 |
 
