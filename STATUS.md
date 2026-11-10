@@ -55,7 +55,7 @@
 
 | ID | 任务 | 状态 | 交付物 |
 |---|---|---|---|
-| PB-01 | 审核 B 段契约：索引/检索/LLM/历史接口（`interface-contracts.md` §3.7/§3.8）、Qdrant payload 与 Tantivy（`data-model.md` §3.1/§3.2）、Qdrant 进程契约（配合 PX-01） | 待审核 | 审核意见（PR）+ 在 `docs/contract-review-0.1.0.md` 签字（B 2026-11-09 已签，附 F1–F5，其中 F4/F5 需冻结前改，见该文件 §4.4） |
+| PB-01 | 审核 B 段契约：索引/检索/LLM/历史接口（`interface-contracts.md` §3.7/§3.8）、Qdrant payload 与 Tantivy（`data-model.md` §3.1/§3.2）、Qdrant 进程契约（配合 PX-01） | 待审核 | 审核意见（PR）+ 在 `docs/contract-review-0.1.0.md` 签字（B 2026-11-09 已签，附 F1–F7：F4/F5 需冻结前改，F1/F2/F6 须 W1 前定，见该文件 §4.4） |
 
 ### 3.3 C — 数据管线与同步
 
